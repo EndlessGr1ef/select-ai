@@ -1,0 +1,63 @@
+export const translations = {
+  popup: {
+    title: { zh: 'AI 划词搜索', en: 'Select AI' },
+    subtitle: { zh: '划词即解释 · 智能上下文', en: 'Select to explain · Smart context' },
+    statusReady: { zh: '插件已就绪', en: 'Extension ready' },
+    statusNeedConfig: { zh: '需要配置', en: 'Configuration needed' },
+    apiKeyPreview: { zh: 'API Key: ', en: 'API Key: ' },
+    needApiKey: { zh: '请先配置 API 密钥以启用功能', en: 'Please configure API key to enable' },
+    usageTitle: { zh: '使用方法', en: 'How to use' },
+    usageSteps: {
+      zh: ['在网页上划选任意文字', '点击出现的粉紫色小圆点', 'AI 将自动分析上下文并给出解释或翻译'],
+      en: ['Select any text on the webpage', 'Click the pink-purple dot', 'AI will analyze and explain or translate'],
+    },
+    settingsBtn: { zh: '设置选项', en: 'Settings' },
+    version: { zh: '🚀 v1.0.0', en: '🚀 v1.0.0' },
+  },
+  options: {
+    title: { zh: 'AI 划词搜索', en: 'Select AI' },
+    subtitle: { zh: '划词即解释 · 智能上下文分析', en: 'Select to explain · Smart context analysis' },
+    apiSection: { zh: 'API 配置', en: 'API Configuration' },
+    providerLabel: { zh: '模型提供商', en: 'Provider' },
+    providerPlaceholder: { zh: '请选择模型提供商', en: 'Select provider' },
+    openaiName: { zh: 'OpenAI (GPT-4)', en: 'OpenAI (GPT-4)' },
+    anthropicName: { zh: 'Anthropic (Claude)', en: 'Anthropic (Claude)' },
+    minimaxName: { zh: 'MiniMax', en: 'MiniMax' },
+    apiKeyLabel: { zh: 'API 密钥', en: 'API Key' },
+    apiKeyPlaceholder: { zh: 'sk-...', en: 'sk-...' },
+    baseUrlLabel: { zh: '接口地址 (Base URL)', en: 'Base URL' },
+    baseUrlHint: { zh: '默认: https://api.minimaxi.com/anthropic', en: 'Default: https://api.minimaxi.com/anthropic' },
+    modelSection: { zh: '模型设置', en: 'Model Settings' },
+    modelLabel: { zh: '模型标识', en: 'Model' },
+    targetLangLabel: { zh: '输出语言', en: 'Output Language' },
+    saveBtn: { zh: '保存配置', en: 'Save Configuration' },
+    saveSuccess: { zh: '✓ 配置已保存', en: '✓ Configuration saved' },
+    guideTitle: { zh: '📖 使用指南', en: '📖 User Guide' },
+    guideSteps: {
+      zh: ['在网页上划选任意文字', '点击出现的粉紫色小圆点', 'AI 将自动分析上下文并给出解释或翻译'],
+      en: ['Select any text on the webpage', 'Click the pink-purple dot', 'AI will analyze and provide explanation or translation'],
+    },
+  },
+  content: {
+    loading: { zh: '正在分析上下文...', en: 'Analyzing context...' },
+    errorTitle: { zh: '错误:', en: 'Error:' },
+    extUpdated: { zh: '扩展已更新，请刷新页面后重试', en: 'Extension updated, please refresh' },
+    noResponse: { zh: '服务未响应，请刷新页面重试', en: 'Service not responding, please retry' },
+    copyTitle: { zh: '复制', en: 'Copy' },
+    speakTitle: { zh: '朗读', en: 'Read aloud' },
+    likeTitle: { zh: '点赞', en: 'Like' },
+    dislikeTitle: { zh: '踩', en: 'Dislike' },
+  },
+  background: {
+    prompt: {
+      zh: `你是一个极简解释助手。用户在浏览网页时选中了一段文字进行查询。
+请结合提供的页面信息和上下文内容，对选中的文字进行精准、简练的解释或翻译。
+目标语言: 中文
+请直接输出核心答案，不要有冗余的开场白。`,
+      en: `You are a concise explanation assistant. The user has selected text while browsing a webpage.
+Based on the page information and context provided, give a precise and concise explanation or translation of the selected text.
+Target language: English
+Output only the core answer without unnecessary introductions.`,
+    },
+  },
+};

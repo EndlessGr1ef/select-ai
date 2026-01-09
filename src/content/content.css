@@ -1,0 +1,9 @@
+/* Content script styles - minimal reset */
+#ai-selection-search-root {
+  all: initial;
+  font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif;
+}
+
+#ai-selection-search-root * {
+  box-sizing: border-box;
+}

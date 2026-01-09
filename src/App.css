@@ -1,0 +1,36 @@
+/* Popup App Styles */
+#root {
+  margin: 0;
+  padding: 0;
+}
+
+/* Remove default body margin for popup */
+body {
+  margin: 0;
+  padding: 0;
+  min-width: auto;
+  min-height: auto;
+}
+
+/* Smooth transitions for interactive elements */
+button {
+  font-family: inherit;
+}
+
+/* Custom scrollbar for info sections */
+::-webkit-scrollbar {
+  width: 4px;
+}
+
+::-webkit-scrollbar-track {
+  background: #f1f5f9;
+}
+
+::-webkit-scrollbar-thumb {
+  background: #cbd5e1;
+  border-radius: 2px;
+}
+
+::-webkit-scrollbar-thumb:hover {
+  background: #94a3b8;
+}

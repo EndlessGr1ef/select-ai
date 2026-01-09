@@ -1,0 +1,27 @@
+{
+  "manifest_version": 3,
+  "name": "Select AI",
+  "version": "1.0.0",
+  "description": "AI-powered selection search with context awareness",
+  "permissions": ["storage", "activeTab"],
+  "action": {
+    "default_popup": "index.html",
+    "default_icon": {
+      "16": "icon.svg",
+      "48": "icon.svg",
+      "128": "icon.svg"
+    }
+  },
+  "options_page": "options.html",
+  "background": {
+    "service_worker": "src/background/index.ts",
+    "type": "module"
+  },
+  "content_scripts": [
+    {
+      "matches": ["<all_urls>"],
+      "js": ["src/content/index.tsx"]
+    }
+  ],
+  "host_permissions": ["<all_urls>"]
+}
