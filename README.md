@@ -1,101 +1,163 @@
-# Select AI
+# Select AI - AI划词解释🎯
 
-一个智能划词搜索 Chrome 扩展，具有上下文感知功能。选中网页上的文字即可获得即时 AI 解释。
+<div align="center">
 
-[English](./README.en.md)
+**AI-powered 划词搜索工具 | 选中即解释 | 上下文感知**
 
-## 功能特性
+[![MIT License](https://img.shields.io/badge/License-MIT-green.svg)](LICENSE)
+[![Chrome Extension](https://img.shields.io/badge/Chrome-Extension-blue.svg)]()
 
-- 🎯 **即时搜索** - 选中文字后点击浮动按钮获取 AI 解释
-- 🧠 **上下文感知** - 自动提取周围上下文以获得更好的理解
-- 🌍 **多语言支持** - 支持中文、英文、日文、韩文输出
-- ⚙️ **可配置 API** - 自定义 API 端点和模型
-- 💬 **Markdown 渲染** - 优美的 Markdown 格式响应
+</div>
 
-## 安装方式
+![alt text](image.png)
+![alt text](image-2.png)
 
-### 开发者模式（推荐）
+## ✨ 特性
 
-1. **构建扩展**
-   ```bash
-   cd select-ai
-   pnpm install
-   pnpm build
-   ```
+| 特性 | 描述 | 适用场景 |
+|------|------|----------|
+| 🎯 **智能划词** | 选中文字自动弹出悬浮按钮，点击即可查询 | 随时随地获取解释 |
+| 🧠 **上下文感知** | 自动提取周围 500-3000 字符上下文，AI 理解更准确 | 专业术语、复杂句子 |
+| 🌐 **多语言支持** | 支持中文、英语、日语、韩语输出 | 外文阅读、学习 |
+| 🔧 **自定义 API** | 兼容任意 Anthropic 格式 API | 灵活部署、自建服务 |
+| 💬 **Markdown 渲染** | AI 返回内容以优雅的 Markdown 格式展示 | 清晰的阅读体验 |
+| 🖱️ **可拖拽面板** | 结果面板可自由拖动，不遮挡重要内容 | 舒适的使用体验 |
+| 🔒 **隐私优先** | API Key 本地存储，不收集用户数据 | 安全使用 |
 
-2. **在 Chrome 中加载**
-   - 打开 Chrome，访问 `chrome://extensions/`
-   - 开启右上角的 **"开发者模式"**
-   - 点击 **"加载已解压的扩展程序"**
-   - 选择 `select-ai/dist` 目录
+## 📖 为什么选择 Select AI？
 
-3. **配置 API**
-   - 点击扩展图标
-   - 进入"设置"配置你的 API Key
-   - 可自定义 API 端点和模型
+| 传统词典 | Select AI |
+|----------|-----------|
+| 只能查单词/短语 | 整段翻译解释，理解更全面 |
+| 词库有限，更新滞后 | AI 实时理解，覆盖面更广 |
+| 无上下文支持 | 自动获取上下文，专业术语也能懂 |
+| 功能单一 | 支持多语言、多模型、个性化配置 |
 
-### 开发模式
+## 🚀 快速开始
+
+### 1. 安装依赖
 
 ```bash
 cd select-ai
 pnpm install
-pnpm dev
 ```
 
-在 Chrome 中加载 `dist` 目录，修改代码后会自动热更新。
+### 2. 构建扩展
 
-## 使用方法
+```bash
+pnpm build
+```
+
+### 3. 在 Chrome 中加载
+
+1. 打开 Chrome，访问 `chrome://extensions/`
+2. 开启右上角的 **"开发者模式"**
+3. 点击 **"加载已解压的扩展程序"**
+4. 选择 `select-ai/dist` 目录
+
+### 4. 配置 API
+
+1. 点击扩展图标
+2. 进入 **"设置"** 配置你的 API Key
+3. 可自定义 API 端点和模型
+
+## 🔧 开发
+
+```bash
+# 开发模式（热更新）
+pnpm dev
+
+# 构建生产版本
+pnpm build
+
+# 类型检查
+pnpm type-check
+```
+
+## 💻 使用方法
 
 1. 在任意网页中选中一段文字
-2. 点击出现的浮动按钮
+2. 点击出现的粉紫色悬浮按钮
 3. 等待 AI 分析并查看解释结果
 
-## 技术栈
+## 🔌 支持的 API
 
-- React 19 + TypeScript
-- Vite 7
-- Chrome Extension Manifest V3
-- Tailwind CSS 4
-- Lucide React（图标）
+该扩展兼容任意 Anthropic 格式的 API：
 
-## 项目结构
+| Provider | 默认模型 | 说明 |
+|----------|----------|------|
+| **MiniMax** | MiniMax-M2.1 | 默认配置，开箱即用 |
+| **OpenAI** | GPT-4o | 兼容 GPT 系列模型 |
+| **Anthropic Claude** | Claude 3.5 | 兼容 Claude 系列模型 |
+| **自定义** | - | 任何兼容 Anthropic 格式的 API |
+
+## 🛠️ 技术栈
+
+<div align="center">
+
+✨ **React 19** + TypeScript
+⚡ **Vite 7** + HMR
+🔒 **Manifest V3**
+📦 **@crxjs/vite-plugin**
+🎨 **Tailwind CSS 4**
+📱 **Chrome Extension**
+
+</div>
+
+## 📁 项目结构
 
 ```
 select-ai/
 ├── src/
-│   ├── main.tsx             # 弹出窗口入口
-│   ├── App.tsx              # 弹出窗口 UI
-│   ├── background/          # Service Worker
-│   ├── content/             # 内容脚本（划词功能）
-│   ├── options/             # 设置页面
-│   └── utils/               # 工具函数
-├── public/                  # 静态资源
-├── dist/                    # 构建输出
-├── manifest.json            # 扩展配置
-└── vite.config.ts           # Vite 配置
+│   ├── main.tsx              # 弹出窗口入口
+│   ├── App.tsx               # 弹出窗口 UI
+│   ├── background/
+│   │   └── index.ts          # Service Worker（API 请求处理）
+│   ├── content/
+│   │   ├── index.tsx         # 内容脚本入口
+│   │   ├── ContentApp.tsx    # 划词浮层 UI
+│   │   └── content.css       # 内容脚本样式
+│   ├── options/
+│   │   ├── index.tsx         # 设置页面入口
+│   │   └── OptionsApp.tsx    # 设置页面 UI
+│   └── utils/
+│       ├── ContextExtractor.ts  # 上下文提取算法
+│       ├── i18n.ts              # 多语言文案
+│       └── language.ts          # 语言检测
+├── public/
+│   └── icon.svg              # 扩展图标
+├── manifest.json             # 扩展配置
+├── vite.config.ts            # Vite 构建配置
+└── package.json              # 依赖配置
 ```
 
-## API 配置
+## 🤝 贡献
 
-该扩展支持多种 AI API，提供独立配置：
+欢迎贡献代码、提交 Issue 或提出建议！
 
-- **MiniMax**（默认）- 使用 MiniMax-M2.1 模型
-- **OpenAI** - 兼容 GPT-4o 等模型
-- **Anthropic Claude** - 兼容 Claude 系列模型
+- 🐛 发现 Bug？请 [提交 Issue](https://github.com/yourusername/select-ai/issues)
+- 💡 有新想法？请 [提交 Feature Request](https://github.com/yourusername/select-ai/issues)
+- 🔧 想贡献代码？请 Fork 后提交 PR
 
-每个 provider 可独立配置 API Key、端点和模型。
+## 📝 常见问题
 
-## 常见问题
+**Q: 为什么扩展没有响应？**
+A: 请确保已在设置中配置了有效的 API Key。
 
-### Q: 为什么扩展没有响应？
-请确保已在设置中配置了有效的 API Key。
+**Q: 为什么没有出现悬浮按钮？**
+A: 检查页面是否有内容脚本限制。部分网站（如 `chrome://` 页面）无法注入内容脚本。
 
-### Q: 为什么没有出现浮动按钮？
-检查页面是否有内容脚本限制。部分网站（如 chrome:// 页面）无法注入内容脚本。
+**Q: 支持哪些 API？**
+A: 任何兼容 Anthropic 格式的 API 都支持，包括 OpenAI、Claude、MiniMax 等。
 
-### Q: 支持哪些 API？
-任何兼容 Anthropic 格式的 API 都支持。
+## 📄 许可证
 
-## 许可证
+MIT License - 详见 [LICENSE](LICENSE)
 
-MIT
+---
+
+<div align="center">
+
+**如果这个项目对你有帮助，欢迎点亮 Star ⭐**
+
+</div>

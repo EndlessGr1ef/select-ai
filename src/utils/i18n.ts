@@ -48,16 +48,4 @@ export const translations = {
     likeTitle: { zh: '点赞', en: 'Like' },
     dislikeTitle: { zh: '踩', en: 'Dislike' },
   },
-  background: {
-    prompt: {
-      zh: `你是一个极简解释助手。用户在浏览网页时选中了一段文字进行查询。
-请结合提供的页面信息和上下文内容，对选中的文字进行精准、简练的解释或翻译。
-目标语言: 中文
-请直接输出核心答案，不要有冗余的开场白。`,
-      en: `You are a concise explanation assistant. The user has selected text while browsing a webpage.
-Based on the page information and context provided, give a precise and concise explanation or translation of the selected text.
-Target language: English
-Output only the core answer without unnecessary introductions.`,
-    },
-  },
 };

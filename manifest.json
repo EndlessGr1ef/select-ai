@@ -1,6 +1,6 @@
 {
   "manifest_version": 3,
-  "name": "Select AI",
+  "name": "Select AI（AI划词解释）",
   "version": "1.0.0",
   "description": "AI-powered selection search with context awareness",
   "permissions": ["storage", "activeTab"],

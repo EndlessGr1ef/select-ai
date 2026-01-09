@@ -1,101 +1,163 @@
-# Select AI
+# Select AI 🎯
 
-An AI-powered selection search Chrome extension with context awareness. Select text on any webpage to get instant AI explanations.
+<div align="center">
 
-[中文文档](./README.md)
+**AI-powered Selection Search | Select to Explain | Context-aware**
 
-## Features
+[![MIT License](https://img.shields.io/badge/License-MIT-green.svg)](LICENSE)
+[![Chrome Extension](https://img.shields.io/badge/Chrome-Extension-blue.svg)]()
 
-- 🎯 **Instant Search** - Select text and click the floating button to get AI explanations
-- 🧠 **Context Awareness** - Automatically extracts surrounding context for better understanding
-- 🌍 **Multi-language Support** - Supports Chinese, English, Japanese, and Korean output
-- ⚙️ **Customizable API** - Configure your own API endpoint and model
-- 💬 **Markdown Rendering** - Beautiful markdown-formatted responses
+</div>
 
-## Installation
+![alt text](image.png)
+![alt text](image-3.png)
 
-### Developer Mode (Recommended)
+## ✨ Features
 
-1. **Build the extension**
-   ```bash
-   cd select-ai
-   pnpm install
-   pnpm build
-   ```
+| Feature | Description | Use Case |
+|---------|-------------|----------|
+| 🎯 **Smart Selection** | Floating button appears on text selection, click to query | Get instant explanations |
+| 🧠 **Context Awareness** | Auto-extract 500-3000 characters context for accurate AI understanding | Technical terms, complex sentences |
+| 🌐 **Multi-language** | Supports Chinese, English, Japanese, Korean output | Foreign language reading & learning |
+| 🔧 **Custom API** | Compatible with any Anthropic-format API | Flexible deployment, self-hosted services |
+| 💬 **Markdown Rendering** | AI responses displayed in beautiful Markdown format | Clear, readable output |
+| 🖱️ **Draggable Panel** | Results panel can be freely positioned | Comfortable user experience |
+| 🔒 **Privacy First** | API keys stored locally, no user data collection | Secure usage |
 
-2. **Load in Chrome**
-   - Open Chrome and visit `chrome://extensions/`
-   - Enable **"Developer mode"** in the top right
-   - Click **"Load unpacked"**
-   - Select the `select-ai/dist` directory
+## 📖 Why Select AI?
 
-3. **Configure API**
-   - Click the extension icon
-   - Go to "Settings" to configure your API Key
-   - Optionally customize API endpoint and model
+| Traditional Dictionaries | Select AI |
+|--------------------------|-----------|
+| Words/phrases only | Full translation & explanation |
+| Limited vocabulary, slow updates | AI real-time understanding, broader coverage |
+| No context support | Auto context extraction, handles technical terms |
+| Single function | Multi-language, multi-model, customizable |
 
-### Development Mode
+## 🚀 Quick Start
+
+### 1. Install Dependencies
 
 ```bash
 cd select-ai
 pnpm install
-pnpm dev
 ```
 
-Load the `dist` directory in Chrome. Changes will auto-reload.
+### 2. Build the Extension
 
-## Usage
+```bash
+pnpm build
+```
+
+### 3. Load in Chrome
+
+1. Open Chrome and visit `chrome://extensions/`
+2. Enable **"Developer mode"** in the top right corner
+3. Click **"Load unpacked"**
+4. Select the `select-ai/dist` directory
+
+### 4. Configure API
+
+1. Click the extension icon
+2. Go to **"Settings"** to configure your API Key
+3. Optionally customize API endpoint and model
+
+## 🔧 Development
+
+```bash
+# Development mode (hot reload)
+pnpm dev
+
+# Build for production
+pnpm build
+
+# Type checking
+pnpm type-check
+```
+
+## 💻 Usage
 
 1. Select any text on a webpage
-2. Click the floating button that appears
+2. Click the pink-purple floating button
 3. Wait for AI analysis and view the explanation
 
-## Tech Stack
+## 🔌 Supported APIs
 
-- React 19 + TypeScript
-- Vite 7
-- Chrome Extension Manifest V3
-- Tailwind CSS 4
-- Lucide React (icons)
+This extension is compatible with any Anthropic-format API:
 
-## Project Structure
+| Provider | Default Model | Description |
+|----------|---------------|-------------|
+| **MiniMax** | MiniMax-M2.1 | Ready to use out of the box |
+| **OpenAI** | GPT-4o | Compatible with GPT series |
+| **Anthropic Claude** | Claude 3.5 | Compatible with Claude series |
+| **Custom** | - | Any Anthropic-format API |
+
+## 🛠️ Tech Stack
+
+<div align="center">
+
+✨ **React 19** + TypeScript
+⚡ **Vite 7** + HMR
+🔒 **Manifest V3**
+📦 **@crxjs/vite-plugin**
+🎨 **Tailwind CSS 4**
+📱 **Chrome Extension**
+
+</div>
+
+## 📁 Project Structure
 
 ```
 select-ai/
 ├── src/
-│   ├── main.tsx             # Popup entry point
-│   ├── App.tsx              # Popup UI
-│   ├── background/          # Service Worker
-│   ├── content/             # Content scripts (selection feature)
-│   ├── options/             # Settings page
-│   └── utils/               # Utility functions
-├── public/                  # Static assets
-├── dist/                    # Build output
-├── manifest.json            # Extension manifest
-└── vite.config.ts           # Vite configuration
+│   ├── main.tsx              # Popup entry point
+│   ├── App.tsx               # Popup UI
+│   ├── background/
+│   │   └── index.ts          # Service Worker (API request handling)
+│   ├── content/
+│   │   ├── index.tsx         # Content script entry
+│   │   ├── ContentApp.tsx    # Selection floating UI
+│   │   └── content.css       # Content script styles
+│   ├── options/
+│   │   ├── index.tsx         # Settings page entry
+│   │   └── OptionsApp.tsx    # Settings page UI
+│   └── utils/
+│       ├── ContextExtractor.ts  # Context extraction algorithm
+│       ├── i18n.ts              # Multi-language strings
+│       └── language.ts          # Language detection
+├── public/
+│   └── icon.svg              # Extension icon
+├── manifest.json             # Extension configuration
+├── vite.config.ts            # Vite build configuration
+└── package.json              # Dependencies
 ```
 
-## API Configuration
+## 🤝 Contributing
 
-This extension supports multiple AI APIs with independent configuration:
+Contributions, issues, and feature requests are welcome!
 
-- **MiniMax** (default) - Uses MiniMax-M2.1 model
-- **OpenAI** - Compatible with GPT-4o and other models
-- **Anthropic Claude** - Compatible with Claude series models
+- 🐛 Found a bug? Please [open an issue](https://github.com/yourusername/select-ai/issues)
+- 💡 Have an idea? Please [submit a Feature Request](https://github.com/yourusername/select-ai/issues)
+- 🔧 Want to contribute? Fork and submit a PR
 
-Each provider can independently configure API Key, endpoint, and model.
+## 📝 FAQ
 
-## FAQ
+**Q: Why doesn't the extension respond?**
+A: Make sure you have configured a valid API Key in settings.
 
-### Q: Why doesn't the extension respond?
-Ensure you have configured a valid API Key in settings.
+**Q: Why doesn't the floating button appear?**
+A: Check if the page has Content Script restrictions. Some sites (like `chrome://` pages) cannot inject content scripts.
 
-### Q: Why doesn't the floating button appear?
-Check if the page has Content Script restrictions. Some sites (like chrome:// pages) cannot inject content scripts.
+**Q: What APIs are supported?**
+A: Any API with Anthropic-compatible format is supported, including OpenAI, Claude, MiniMax, and more.
 
-### Q: What APIs are supported?
-Any API with Anthropic-compatible format is supported.
+## 📄 License
 
-## License
+MIT License - see [LICENSE](LICENSE)
 
-MIT
+---
+
+<div align="center">
+
+**If you find this project helpful, please give it a Star ⭐**
+
+</div>

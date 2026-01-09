@@ -126,31 +126,6 @@ const ContentApp: React.FC = () => {
     const pageUrl = window.location.href;
     const pageTitle = document.title;
 
-    // Build and log the prompts that will be sent to LLM
-    const MAX_CONTEXT_FOR_API = 2000;
-    const contextForApi = context.length > MAX_CONTEXT_FOR_API
-      ? context.substring(0, MAX_CONTEXT_FOR_API) + '...'
-      : context;
-
-    const systemPrompt = lang === 'zh'
-      ? translations.background.prompt.zh
-      : translations.background.prompt.en;
-
-    const userPrompt = `<page>
-  <url>${pageUrl}</url>
-  <title>${pageTitle}</title>
-</page>
-<context>${contextForApi}</context>
-<selection>${selection}</selection>
-
-请解释上述选中内容。`;
-
-    console.log('%c[AI Search] === LLM REQUEST ===', 'color: #3b82f6; font-weight: bold');
-    console.log('%c[System Prompt]', 'color: #8b5cf6; font-weight: bold');
-    console.log(systemPrompt);
-    console.log('%c[User Prompt]', 'color: #8b5cf6; font-weight: bold');
-    console.log(userPrompt);
-
     // Check if extension context is still valid
     if (!chrome.runtime?.id) {
       setLoading(false);

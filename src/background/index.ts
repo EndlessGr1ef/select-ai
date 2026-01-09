@@ -90,13 +90,14 @@ async function handleAIQuery(payload: {
 
   const systemPrompt = isChineseUI
     ? `你是一个极简解释助手。用户在浏览网页时选中了一段文字进行查询。
-请结合提供的页面信息和上下文内容，对选中的文字进行精准、简练的解释或翻译。
+请结合提供的页面信息和上下文内容，对选中的文字进行精准、简练的解释和翻译。
 目标语言: ${targetLang}
-请直接输出核心答案，不要有冗余的开场白。`
+注意：输出的结果要先解释其本身的意思，再解释选中内容在上下文中的意思。`
     : `You are a concise explanation assistant. The user has selected text while browsing a webpage.
 Based on the page information and context provided, give a precise and concise explanation or translation of the selected text.
 Target language: ${targetLang}
-Output only the core answer without unnecessary introductions.`;
+
+Note: For output content please first explain ortranslate its base meaning, then explain its meaning in the context.`;
 
   const userPrompt = `<page>
   <url>${payload.pageUrl || 'unknown'}</url>
@@ -117,6 +118,7 @@ Output only the core answer without unnecessary introductions.`;
     body: JSON.stringify({
       model: model,
       max_tokens: 1024,
+      temperature: 0.1,
       system: systemPrompt,
       messages: [
         { role: 'user', content: userPrompt }
