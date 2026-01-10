@@ -3,7 +3,7 @@
 console.log('[AI Search] Background service worker loaded');
 
 // Provider configurations
-type Provider = 'openai' | 'anthropic' | 'minimax' | 'deepseek';
+type Provider = 'openai' | 'anthropic' | 'minimax' | 'deepseek' | 'glm';
 
 interface ProviderConfig {
   defaultBaseUrl: string;
@@ -38,6 +38,11 @@ const PROVIDER_CONFIGS: Record<Provider, ProviderConfig> = {
     defaultModel: 'deepseek-chat',
     storageKey: 'deepseek',
   },
+  glm: {
+    defaultBaseUrl: 'https://open.bigmodel.cn/api/anthropic',
+    defaultModel: 'glm-4.7',
+    storageKey: 'glm',
+  },
 };
 
 // API 请求配置（根据 provider 动态调整）
@@ -59,6 +64,11 @@ const API_CONFIGS: Record<Provider, ProviderApiConfig> = {
   },
   deepseek: {
     endpointPath: '/v1/chat/completions',
+    authHeader: 'Bearer',
+    extraHeaders: {},
+  },
+  glm: {
+    endpointPath: '',
     authHeader: 'Bearer',
     extraHeaders: {},
   },

@@ -3,7 +3,7 @@ import { getUILanguage, isBrowserChinese } from '../utils/language';
 import { translations } from '../utils/i18n';
 
 // Provider configurations
-type Provider = 'openai' | 'anthropic' | 'minimax' | 'deepseek';
+type Provider = 'openai' | 'anthropic' | 'minimax' | 'deepseek' | 'glm';
 
 interface ProviderConfig {
   name: Record<'zh' | 'en', string>;
@@ -36,6 +36,12 @@ const PROVIDER_CONFIGS: Record<Provider, ProviderConfig> = {
     defaultBaseUrl: 'https://api.deepseek.com',
     defaultModel: 'deepseek-chat',
     storageKey: 'deepseek',
+  },
+  glm: {
+    name: { zh: '智谱 AI (GLM-4)', en: 'Zhipu AI (GLM-4)' },
+    defaultBaseUrl: 'https://open.bigmodel.cn/api/anthropic',
+    defaultModel: 'glm-4.7',
+    storageKey: 'glm',
   },
 };
 
@@ -366,6 +372,7 @@ const OptionsApp: React.FC = () => {
                 <option value="anthropic">{t.anthropicName[lang]}</option>
                 <option value="minimax">{t.minimaxName[lang]}</option>
                 <option value="deepseek">{t.deepseekName[lang]}</option>
+                <option value="glm">{t.glmName[lang]}</option>
               </select>
             </div>
 

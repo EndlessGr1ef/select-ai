@@ -24,6 +24,7 @@ export const translations = {
     anthropicName: { zh: 'Anthropic (Claude)', en: 'Anthropic (Claude)' },
     minimaxName: { zh: 'MiniMax', en: 'MiniMax' },
     deepseekName: { zh: 'DeepSeek', en: 'DeepSeek' },
+    glmName: { zh: '智谱 AI (GLM-4)', en: 'Zhipu AI (GLM-4)' },
     apiKeyLabel: { zh: 'API 密钥', en: 'API Key' },
     apiKeyPlaceholder: { zh: 'sk-...', en: 'sk-...' },
     showApiKey: { zh: '显示密钥', en: 'Show API Key' },

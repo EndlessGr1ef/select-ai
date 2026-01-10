@@ -4,7 +4,7 @@ import { getUILanguage } from './utils/language'
 import { translations } from './utils/i18n'
 
 // Provider configurations
-type Provider = 'openai' | 'anthropic' | 'minimax' | 'deepseek';
+type Provider = 'openai' | 'anthropic' | 'minimax' | 'deepseek' | 'glm';
 
 interface ProviderConfig {
   defaultBaseUrl: string;
@@ -33,6 +33,11 @@ const PROVIDER_CONFIGS: Record<Provider, ProviderConfig> = {
     defaultModel: 'deepseek-chat',
     storageKey: 'deepseek',
   },
+  glm: {
+    defaultBaseUrl: 'https://open.bigmodel.cn/api/anthropic',
+    defaultModel: 'glm-4.7',
+    storageKey: 'glm',
+  },
 };
 
 function App() {
@@ -47,6 +52,7 @@ function App() {
     anthropic: { zh: 'Anthropic (Claude)', en: 'Anthropic (Claude)' },
     minimax: { zh: 'MiniMax', en: 'MiniMax' },
     deepseek: { zh: 'DeepSeek', en: 'DeepSeek' },
+    glm: { zh: '智谱 AI (GLM-4)', en: 'Zhipu AI (GLM-4)' },
   };
 
   useEffect(() => {
