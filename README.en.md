@@ -23,7 +23,7 @@
 | 🎯 **Smart Selection** | Floating button appears on text selection, click to query | Get instant explanations |
 | 🧠 **Context Awareness** | Auto-extract 500-3000 characters context for accurate AI understanding | Technical terms, complex sentences |
 | 🌐 **Multi-language** | Supports Chinese, English, Japanese, Korean output | Foreign language reading & learning |
-| 🔌 **Multi-API Support** | MiniMax / OpenAI / Claude / DeepSeek / Custom API | Flexible deployment, self-hosted services |
+| 🔌 **Multi-API Support** | MiniMax / OpenAI / Claude / DeepSeek / GLM-4 / Custom API | Flexible deployment, self-hosted services |
 | 💬 **Markdown Rendering** | AI responses displayed in beautiful Markdown format | Clear, readable output |
 | 🔒 **Privacy First** | API keys stored locally, no user data collection | Secure usage |
 
@@ -94,6 +94,7 @@ This extension is compatible with any Anthropic-format API:
 | **OpenAI** | GPT-4o | Compatible with GPT series |
 | **Anthropic Claude** | Claude 3.5 | Compatible with Claude series |
 | **DeepSeek** | DeepSeek Chat | Compatible with DeepSeek series |
+| **GLM-4** | GLM-4.7 | Zhipu AI series models |
 | **Custom** | - | Any Anthropic-format API |
 
 ## 🛠️ Tech Stack
@@ -153,7 +154,7 @@ A: Make sure you have configured a valid API Key in settings.
 A: Check if the page has Content Script restrictions. Some sites (like `chrome://` pages) cannot inject content scripts.
 
 **Q: What APIs are supported?**
-A: Supports MiniMax, OpenAI, Anthropic Claude, DeepSeek, and any custom API with Anthropic-compatible format.
+A: Supports MiniMax, OpenAI, Anthropic Claude, DeepSeek, GLM-4, and any custom API with Anthropic-compatible format.
 
 ## 📄 License
 
