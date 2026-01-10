@@ -40,27 +40,26 @@
 
 ## 🚀 Quick Start
 
-### 1. Install Dependencies
+### Method 1: Direct Install (Recommended)
+
+1. Download [chrome_extension.zip](chrome_extension.zip)
+2. Extract to any directory
+3. Open Chrome and visit `chrome://extensions/`
+4. Enable **"Developer mode"** in the top right corner
+5. Click **"Load unpacked"**
+6. Select the extracted folder
+
+### Method 2: Build from Source
 
 ```bash
 cd select-ai
 pnpm install
-```
-
-### 2. Build the Extension
-
-```bash
 pnpm build
 ```
 
-### 3. Load in Chrome
+Then load the `select-ai/dist` directory in Chrome.
 
-1. Open Chrome and visit `chrome://extensions/`
-2. Enable **"Developer mode"** in the top right corner
-3. Click **"Load unpacked"**
-4. Select the `select-ai/dist` directory
-
-### 4. Configure API
+### 3. Configure API
 
 1. Click the extension icon
 2. Go to **"Settings"** to configure your API Key

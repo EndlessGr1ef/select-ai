@@ -39,27 +39,26 @@
 
 ## 🚀 快速开始
 
-### 1. 安装依赖
+### 方式一：直接安装（推荐）
+
+1. 下载 [chrome_extension.zip](chrome_extension.zip)
+2. 解压到任意目录
+3. 打开 Chrome，访问 `chrome://extensions/`
+4. 开启右上角的 **"开发者模式"**
+5. 点击 **"加载已解压的扩展程序"**
+6. 选择解压后的文件夹
+
+### 方式二：源码构建
 
 ```bash
 cd select-ai
 pnpm install
-```
-
-### 2. 构建扩展
-
-```bash
 pnpm build
 ```
 
-### 3. 在 Chrome 中加载
+然后在 Chrome 中加载 `select-ai/dist` 目录
 
-1. 打开 Chrome，访问 `chrome://extensions/`
-2. 开启右上角的 **"开发者模式"**
-3. 点击 **"加载已解压的扩展程序"**
-4. 选择 `select-ai/dist` 目录
-
-### 4. 配置 API
+### 3. 配置 API
 
 1. 点击扩展图标
 2. 进入 **"设置"** 配置你的 API Key
