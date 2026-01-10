@@ -6,6 +6,7 @@
 
 [![MIT License](https://img.shields.io/badge/License-MIT-green.svg)](LICENSE)
 [![Chrome Extension](https://img.shields.io/badge/Chrome-Extension-blue.svg)]()
+[![English](https://img.shields.io/badge/English-README-blue)](README.en.md)
 
 </div>
 
