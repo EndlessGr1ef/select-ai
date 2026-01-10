@@ -9,9 +9,11 @@
 [![English](https://img.shields.io/badge/English-README-blue)](README.en.md)
 
 </div>
+<div align="center">
 
-![alt text](image.png)
-![alt text](image-2.png)
+![Demo](demo.gif)
+
+</div>
 
 ## ✨ 特性
 
@@ -20,9 +22,8 @@
 | 🎯 **智能划词** | 选中文字自动弹出悬浮按钮，点击即可查询 | 随时随地获取解释 |
 | 🧠 **上下文感知** | 自动提取周围 500-3000 字符上下文，AI 理解更准确 | 专业术语、复杂句子 |
 | 🌐 **多语言支持** | 支持中文、英语、日语、韩语输出 | 外文阅读、学习 |
-| 🔧 **自定义 API** | 兼容任意 Anthropic 格式 API | 灵活部署、自建服务 |
+| 🔌 **多 API 支持** | MiniMax / OpenAI / Claude / DeepSeek / 自定义 API | 灵活部署、自建服务 |
 | 💬 **Markdown 渲染** | AI 返回内容以优雅的 Markdown 格式展示 | 清晰的阅读体验 |
-| 🖱️ **可拖拽面板** | 结果面板可自由拖动，不遮挡重要内容 | 舒适的使用体验 |
 | 🔒 **隐私优先** | API Key 本地存储，不收集用户数据 | 安全使用 |
 
 ## 📖 为什么选择 Select AI？
@@ -33,6 +34,8 @@
 | 词库有限，更新滞后 | AI 实时理解，覆盖面更广 |
 | 无上下文支持 | 自动获取上下文，专业术语也能懂 |
 | 功能单一 | 支持多语言、多模型、个性化配置 |
+| 付费订阅制 | 完全免费，无隐藏费用 |
+| 数据上传云端 | 本地处理，安全无忧 |
 
 ## 🚀 快速开始
 
@@ -90,6 +93,7 @@ pnpm type-check
 | **MiniMax** | MiniMax-M2.1 | 默认配置，开箱即用 |
 | **OpenAI** | GPT-4o | 兼容 GPT 系列模型 |
 | **Anthropic Claude** | Claude 3.5 | 兼容 Claude 系列模型 |
+| **DeepSeek** | DeepSeek Chat | 兼容 DeepSeek 系列模型 |
 | **自定义** | - | 任何兼容 Anthropic 格式的 API |
 
 ## 🛠️ 技术栈
@@ -149,7 +153,7 @@ A: 请确保已在设置中配置了有效的 API Key。
 A: 检查页面是否有内容脚本限制。部分网站（如 `chrome://` 页面）无法注入内容脚本。
 
 **Q: 支持哪些 API？**
-A: 任何兼容 Anthropic 格式的 API 都支持，包括 OpenAI、Claude、MiniMax 等。
+A: 支持 MiniMax、OpenAI、Anthropic Claude、DeepSeek，以及任何兼容 Anthropic 格式的自定义 API。
 
 ## 📄 许可证
 

@@ -3,12 +3,18 @@
 console.log('[AI Search] Background service worker loaded');
 
 // Provider configurations
-type Provider = 'openai' | 'anthropic' | 'minimax';
+type Provider = 'openai' | 'anthropic' | 'minimax' | 'deepseek';
 
 interface ProviderConfig {
   defaultBaseUrl: string;
   defaultModel: string;
   storageKey: string;
+}
+
+interface ProviderApiConfig {
+  endpointPath: string;  // API endpoint 路径
+  authHeader: 'Bearer' | 'x-api-key';  // 认证方式
+  extraHeaders: Record<string, string>;  // 额外请求头
 }
 
 const PROVIDER_CONFIGS: Record<Provider, ProviderConfig> = {
@@ -26,6 +32,35 @@ const PROVIDER_CONFIGS: Record<Provider, ProviderConfig> = {
     defaultBaseUrl: 'https://api.minimaxi.com/anthropic',
     defaultModel: 'MiniMax-M2.1',
     storageKey: 'minimax',
+  },
+  deepseek: {
+    defaultBaseUrl: 'https://api.deepseek.com',
+    defaultModel: 'deepseek-chat',
+    storageKey: 'deepseek',
+  },
+};
+
+// API 请求配置（根据 provider 动态调整）
+const API_CONFIGS: Record<Provider, ProviderApiConfig> = {
+  openai: {
+    endpointPath: '',  // 完整路径已在 baseUrl 中
+    authHeader: 'Bearer',
+    extraHeaders: {},
+  },
+  anthropic: {
+    endpointPath: '',
+    authHeader: 'x-api-key',
+    extraHeaders: { 'anthropic-version': '2023-06-01' },
+  },
+  minimax: {
+    endpointPath: '/v1/messages',
+    authHeader: 'x-api-key',
+    extraHeaders: { 'anthropic-version': '2023-06-01' },
+  },
+  deepseek: {
+    endpointPath: '/v1/chat/completions',
+    authHeader: 'Bearer',
+    extraHeaders: {},
   },
 };
 
@@ -108,23 +143,44 @@ Note: For output content please first explain ortranslate its base meaning, then
 
 请解释上述选中内容。`;
 
-  const response = await fetch(`${baseUrl}/v1/messages`, {
+  const apiConfig = API_CONFIGS[provider];
+  const endpoint = `${baseUrl}${apiConfig.endpointPath}`;
+  const authHeader = apiConfig.authHeader === 'Bearer'
+    ? `Bearer ${apiKey}`
+    : apiKey;
+
+  // OpenAI 需要将 system 放在 messages 数组中
+  const isOpenAI = provider === 'openai';
+  const requestBody = isOpenAI
+    ? {
+        model: model,
+        max_tokens: 1024,
+        temperature: 0.1,
+        messages: [
+          { role: 'system', content: systemPrompt },
+          { role: 'user', content: userPrompt }
+        ],
+        stream: false
+      }
+    : {
+        model: model,
+        max_tokens: 1024,
+        temperature: 0.1,
+        system: systemPrompt,
+        messages: [
+          { role: 'user', content: userPrompt }
+        ],
+        stream: false
+      };
+
+  const response = await fetch(endpoint, {
     method: 'POST',
     headers: {
       'Content-Type': 'application/json',
-      'x-api-key': apiKey,
-      'anthropic-version': '2023-06-01'
+      [apiConfig.authHeader === 'Bearer' ? 'Authorization' : 'x-api-key']: authHeader,
+      ...apiConfig.extraHeaders,
     },
-    body: JSON.stringify({
-      model: model,
-      max_tokens: 1024,
-      temperature: 0.1,
-      system: systemPrompt,
-      messages: [
-        { role: 'user', content: userPrompt }
-      ],
-      stream: false
-    })
+    body: JSON.stringify(requestBody)
   });
 
 

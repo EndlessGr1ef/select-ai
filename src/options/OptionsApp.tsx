@@ -3,7 +3,7 @@ import { getUILanguage, isBrowserChinese } from '../utils/language';
 import { translations } from '../utils/i18n';
 
 // Provider configurations
-type Provider = 'openai' | 'anthropic' | 'minimax';
+type Provider = 'openai' | 'anthropic' | 'minimax' | 'deepseek';
 
 interface ProviderConfig {
   name: Record<'zh' | 'en', string>;
@@ -31,6 +31,12 @@ const PROVIDER_CONFIGS: Record<Provider, ProviderConfig> = {
     defaultModel: 'MiniMax-M2.1',
     storageKey: 'minimax',
   },
+  deepseek: {
+    name: { zh: 'DeepSeek', en: 'DeepSeek' },
+    defaultBaseUrl: 'https://api.deepseek.com',
+    defaultModel: 'deepseek-chat',
+    storageKey: 'deepseek',
+  },
 };
 
 // 根据浏览器语言获取默认输出语言
@@ -46,67 +52,34 @@ const OptionsApp: React.FC = () => {
   const [targetLang, setTargetLang] = useState('');
   const [status, setStatus] = useState<{ type: 'success' | 'error' | 'idle', message: string }>({ type: 'idle', message: '' });
   const [lang, setLang] = useState<'zh' | 'en'>('zh');
+  const [showApiKey, setShowApiKey] = useState(false);
   const [isLoading, setIsLoading] = useState(true);
 
+  // Initialize: load language and selected provider
   useEffect(() => {
     setLang(getUILanguage());
-  }, []);
-
-  useEffect(() => {
-    const providerStorageKey = PROVIDER_CONFIGS[provider].storageKey;
-    chrome.storage.local.get([
-      'selectedProvider',
-      `${providerStorageKey}ApiKey`,
-      `${providerStorageKey}BaseUrl`,
-      `${providerStorageKey}Model`,
-      'targetLanguage'
-    ], (result) => {
-      // Load selected provider
+    chrome.storage.local.get(['selectedProvider', 'targetLanguage'], (result) => {
       if (result.selectedProvider) {
-        const savedProvider = result.selectedProvider as Provider;
-        setProvider(savedProvider);
-        const savedProviderKey = PROVIDER_CONFIGS[savedProvider].storageKey;
-        // Load saved provider's config
-        if (result[`${savedProviderKey}ApiKey`]) {
-          setApiKey(result[`${savedProviderKey}ApiKey`] as string);
-        }
-        if (result[`${savedProviderKey}BaseUrl`]) {
-          setBaseUrl(result[`${savedProviderKey}BaseUrl`] as string);
-        }
-        if (result[`${savedProviderKey}Model`]) {
-          setModel(result[`${savedProviderKey}Model`] as string);
-        }
-      } else {
-        // Legacy support: if old anthropic config exists, migrate it
-        if (result.anthropicApiKey) {
-          setApiKey(result.anthropicApiKey as string);
-        }
-        if (result.anthropicBaseUrl) {
-          setBaseUrl(result.anthropicBaseUrl as string);
-        }
-        if (result.anthropicModel) {
-          setModel(result.anthropicModel as string);
-        }
+        setProvider(result.selectedProvider as Provider);
       }
-
-      // Load target language
-      if (result.targetLanguage) {
-        setTargetLang(result.targetLanguage as string);
-      } else {
-        setTargetLang(getDefaultTargetLanguage());
-      }
+      setTargetLang((result.targetLanguage as string) || getDefaultTargetLanguage());
       setIsLoading(false);
     });
   }, []);
 
-  // Update default values when provider changes
+  // Load saved config when provider changes
   useEffect(() => {
-    const config = PROVIDER_CONFIGS[provider];
-    // Only set defaults if the field is empty (user hasn't manually edited)
-    if (!apiKey && !baseUrl && !model) {
-      setBaseUrl(config.defaultBaseUrl);
-      setModel(config.defaultModel);
-    }
+    const providerStorageKey = PROVIDER_CONFIGS[provider].storageKey;
+    chrome.storage.local.get([
+      `${providerStorageKey}ApiKey`,
+      `${providerStorageKey}BaseUrl`,
+      `${providerStorageKey}Model`
+    ], (result) => {
+      // Load saved provider's config
+      setApiKey((result[`${providerStorageKey}ApiKey`] as string) || '');
+      setBaseUrl((result[`${providerStorageKey}BaseUrl`] as string) || PROVIDER_CONFIGS[provider].defaultBaseUrl);
+      setModel((result[`${providerStorageKey}Model`] as string) || PROVIDER_CONFIGS[provider].defaultModel);
+    });
   }, [provider]);
 
   const t = translations.options;
@@ -311,6 +284,26 @@ const OptionsApp: React.FC = () => {
     animation: 'spin 1s linear infinite',
   };
 
+  const inputWrapperStyle: React.CSSProperties = {
+    position: 'relative' as const,
+  };
+
+  const eyeButtonStyle: React.CSSProperties = {
+    position: 'absolute' as const,
+    right: 12,
+    top: '50%',
+    transform: 'translateY(-50%)',
+    background: 'none',
+    border: 'none',
+    cursor: 'pointer',
+    padding: 4,
+    display: 'flex',
+    alignItems: 'center',
+    justifyContent: 'center',
+    color: '#9ca3af',
+    transition: 'color 0.2s',
+  };
+
   if (isLoading) {
     return (
       <div style={containerStyle}>
@@ -357,11 +350,7 @@ const OptionsApp: React.FC = () => {
                 onChange={(e) => {
                   const newProvider = e.target.value as Provider;
                   setProvider(newProvider);
-                  const config = PROVIDER_CONFIGS[newProvider];
-                  setBaseUrl(config.defaultBaseUrl);
-                  setModel(config.defaultModel);
-                  // Clear API key when switching provider
-                  setApiKey('');
+                  // Config will be loaded by useEffect
                 }}
                 style={selectStyle}
                 onFocus={(e) => {
@@ -376,26 +365,54 @@ const OptionsApp: React.FC = () => {
                 <option value="openai">{t.openaiName[lang]}</option>
                 <option value="anthropic">{t.anthropicName[lang]}</option>
                 <option value="minimax">{t.minimaxName[lang]}</option>
+                <option value="deepseek">{t.deepseekName[lang]}</option>
               </select>
             </div>
 
             <div style={{ marginBottom: 20 }}>
               <label style={labelStyle}>{t.apiKeyLabel[lang]}</label>
-              <input
-                type="password"
-                value={apiKey}
-                onChange={(e) => setApiKey(e.target.value)}
-                placeholder={t.apiKeyPlaceholder[lang]}
-                style={inputStyle}
-                onFocus={(e) => {
-                  e.target.style.borderColor = '#3b82f6';
-                  e.target.style.boxShadow = '0 0 0 3px rgba(59,130,246,0.1)';
-                }}
-                onBlur={(e) => {
-                  e.target.style.borderColor = '#e5e7eb';
-                  e.target.style.boxShadow = 'none';
-                }}
-              />
+              <div style={inputWrapperStyle}>
+                <input
+                  type={showApiKey ? 'text' : 'password'}
+                  value={apiKey}
+                  onChange={(e) => setApiKey(e.target.value)}
+                  placeholder={t.apiKeyPlaceholder[lang]}
+                  style={{
+                    ...inputStyle,
+                    paddingRight: 44,
+                  }}
+                  onFocus={(e) => {
+                    e.target.style.borderColor = '#3b82f6';
+                    e.target.style.boxShadow = '0 0 0 3px rgba(59,130,246,0.1)';
+                  }}
+                  onBlur={(e) => {
+                    e.target.style.borderColor = '#e5e7eb';
+                    e.target.style.boxShadow = 'none';
+                  }}
+                />
+                <button
+                  type="button"
+                  style={eyeButtonStyle}
+                  onClick={() => setShowApiKey(!showApiKey)}
+                  onMouseOver={(e) => e.currentTarget.style.color = '#6b7280'}
+                  onMouseOut={(e) => e.currentTarget.style.color = '#9ca3af'}
+                  title={showApiKey ? t.hideApiKey[lang] : t.showApiKey[lang]}
+                >
+                  {showApiKey ? (
+                    // Eye off icon
+                    <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+                      <path d="M17.94 17.94A10.07 10.07 0 0 1 12 20c-7 0-11-8-11-8a18.45 18.45 0 0 1 5.06-5.94M9.9 4.24A9.12 9.12 0 0 1 12 4c7 0 11 8 11 8a18.5 18.5 0 0 1-2.16 3.19m-6.72-1.07a3 3 0 1 1-4.24-4.24"></path>
+                      <line x1="1" y1="1" x2="23" y2="23"></line>
+                    </svg>
+                  ) : (
+                    // Eye icon
+                    <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+                      <path d="M1 12s4-8 11-8 11 8 11 8-4 8-11 8-11-8-11-8z"></path>
+                      <circle cx="12" cy="12" r="3"></circle>
+                    </svg>
+                  )}
+                </button>
+              </div>
             </div>
 
             <div>
@@ -415,7 +432,7 @@ const OptionsApp: React.FC = () => {
                 }}
               />
               <p style={hintStyle}>
-                {t.baseUrlHint[lang]} {PROVIDER_CONFIGS[provider].defaultBaseUrl}
+                {t.baseUrlHint[lang]}: {PROVIDER_CONFIGS[provider].defaultBaseUrl}
               </p>
             </div>
           </div>

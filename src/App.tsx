@@ -4,7 +4,7 @@ import { getUILanguage } from './utils/language'
 import { translations } from './utils/i18n'
 
 // Provider configurations
-type Provider = 'openai' | 'anthropic' | 'minimax';
+type Provider = 'openai' | 'anthropic' | 'minimax' | 'deepseek';
 
 interface ProviderConfig {
   defaultBaseUrl: string;
@@ -28,12 +28,26 @@ const PROVIDER_CONFIGS: Record<Provider, ProviderConfig> = {
     defaultModel: 'MiniMax-M2.1',
     storageKey: 'minimax',
   },
+  deepseek: {
+    defaultBaseUrl: 'https://api.deepseek.com',
+    defaultModel: 'deepseek-chat',
+    storageKey: 'deepseek',
+  },
 };
 
 function App() {
   const [isConfigured, setIsConfigured] = useState(false);
-  const [apiKeyPreview, setApiKeyPreview] = useState('');
+  const [providerName, setProviderName] = useState('');
+  const [modelName, setModelName] = useState('');
   const [lang, setLang] = useState<'zh' | 'en'>('zh');
+
+  // Provider display names
+  const providerNames: Record<Provider, { zh: string; en: string }> = {
+    openai: { zh: 'OpenAI (GPT-4)', en: 'OpenAI (GPT-4)' },
+    anthropic: { zh: 'Anthropic (Claude)', en: 'Anthropic (Claude)' },
+    minimax: { zh: 'MiniMax', en: 'MiniMax' },
+    deepseek: { zh: 'DeepSeek', en: 'DeepSeek' },
+  };
 
   useEffect(() => {
     setLang(getUILanguage());
@@ -48,17 +62,21 @@ function App() {
         const storageKey = config.storageKey;
 
         // Get the provider-specific API key
-        const settings = await chrome.storage.local.get([`${storageKey}ApiKey`]);
+        const settings = await chrome.storage.local.get([
+          `${storageKey}ApiKey`,
+          `${storageKey}Model`
+        ]);
         const apiKey = settings[`${storageKey}ApiKey`] as string | undefined;
+        const model = settings[`${storageKey}Model`] as string | undefined;
 
         if (apiKey) {
           setIsConfigured(true);
-          // Show last 4 characters
-          setApiKeyPreview('••••' + apiKey.slice(-4));
+          setProviderName(providerNames[selectedProvider][lang]);
+          setModelName(model || config.defaultModel);
         }
       });
     }
-  }, []);
+  }, [lang]);
 
   const t = translations.popup;
 
@@ -243,7 +261,7 @@ function App() {
             </div>
             <div style={statusTextStyle}>
               {isConfigured
-                ? `${t.apiKeyPreview[lang]}${apiKeyPreview}`
+                ? `${providerName} · ${modelName}`
                 : t.needApiKey[lang]}
             </div>
           </div>

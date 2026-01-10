@@ -10,8 +10,11 @@
 
 </div>
 
-![alt text](image.png)
-![alt text](image-3.png)
+<div align="center">
+
+![Demo](demo_en.gif)
+
+</div>
 
 ## ✨ Features
 
@@ -20,9 +23,8 @@
 | 🎯 **Smart Selection** | Floating button appears on text selection, click to query | Get instant explanations |
 | 🧠 **Context Awareness** | Auto-extract 500-3000 characters context for accurate AI understanding | Technical terms, complex sentences |
 | 🌐 **Multi-language** | Supports Chinese, English, Japanese, Korean output | Foreign language reading & learning |
-| 🔧 **Custom API** | Compatible with any Anthropic-format API | Flexible deployment, self-hosted services |
+| 🔌 **Multi-API Support** | MiniMax / OpenAI / Claude / DeepSeek / Custom API | Flexible deployment, self-hosted services |
 | 💬 **Markdown Rendering** | AI responses displayed in beautiful Markdown format | Clear, readable output |
-| 🖱️ **Draggable Panel** | Results panel can be freely positioned | Comfortable user experience |
 | 🔒 **Privacy First** | API keys stored locally, no user data collection | Secure usage |
 
 ## 📖 Why Select AI?
@@ -33,6 +35,8 @@
 | Limited vocabulary, slow updates | AI real-time understanding, broader coverage |
 | No context support | Auto context extraction, handles technical terms |
 | Single function | Multi-language, multi-model, customizable |
+| Paid subscriptions | Completely free, no hidden costs |
+| Data uploaded to cloud | Local processing, safe and secure |
 
 ## 🚀 Quick Start
 
@@ -90,6 +94,7 @@ This extension is compatible with any Anthropic-format API:
 | **MiniMax** | MiniMax-M2.1 | Ready to use out of the box |
 | **OpenAI** | GPT-4o | Compatible with GPT series |
 | **Anthropic Claude** | Claude 3.5 | Compatible with Claude series |
+| **DeepSeek** | DeepSeek Chat | Compatible with DeepSeek series |
 | **Custom** | - | Any Anthropic-format API |
 
 ## 🛠️ Tech Stack
@@ -149,7 +154,7 @@ A: Make sure you have configured a valid API Key in settings.
 A: Check if the page has Content Script restrictions. Some sites (like `chrome://` pages) cannot inject content scripts.
 
 **Q: What APIs are supported?**
-A: Any API with Anthropic-compatible format is supported, including OpenAI, Claude, MiniMax, and more.
+A: Supports MiniMax, OpenAI, Anthropic Claude, DeepSeek, and any custom API with Anthropic-compatible format.
 
 ## 📄 License
 

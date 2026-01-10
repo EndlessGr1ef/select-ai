@@ -29,10 +29,16 @@ const ContentApp: React.FC = () => {
     setLang(getUILanguage());
   }, []);
 
+  // 获取当前 provider 和模型名称
   useEffect(() => {
-    chrome.storage.local.get(['anthropicModel'], (result) => {
-      if (result.anthropicModel) setModelName(result.anthropicModel as string);
-    });
+    const getProviderConfig = async () => {
+      const result = await chrome.storage.local.get(['selectedProvider']);
+      const provider = (result.selectedProvider as string) || 'minimax';
+      const modelKey = `${provider}Model`;
+      const modelResult = await chrome.storage.local.get([modelKey]);
+      setModelName((modelResult[modelKey] as string) || 'MiniMax-M2.1');
+    };
+    getProviderConfig();
   }, []);
 
   // Drag handlers for panel repositioning
@@ -149,7 +155,7 @@ const ContentApp: React.FC = () => {
                 errorMsg.includes('message port closed')) {
               setError(t.extUpdated[lang]);
             } else {
-              setError(errorMsg || '通信错误');
+              setError(errorMsg || 'Communication error');
             }
             return;
           }
@@ -172,7 +178,7 @@ const ContentApp: React.FC = () => {
       if (errorStr.includes('Extension context invalidated')) {
         setError(t.extUpdated[lang]);
       } else {
-        setError('发送请求失败: ' + errorStr);
+        setError('Request failed: ' + errorStr);
       }
     }
   };
@@ -310,6 +316,46 @@ const ContentApp: React.FC = () => {
     justifyContent: 'center',
   };
 
+  // Strip markdown symbols for speech
+  const stripMarkdown = (text: string): string => {
+    return text
+      .replace(/#{1,6}\s+/g, '') // Remove headings
+      .replace(/\*\*/g, '') // Remove bold
+      .replace(/\*/g, '') // Remove italic
+      .replace(/`{1,3}[^`]*`{1,3}/g, '') // Remove code blocks and inline code
+      .replace(/\[([^\]]+)\]\([^)]+\)/g, '$1') // Remove links, keep text
+      .replace(/!\[([^\]]*)\]\([^)]+\)/g, '$1') // Remove images, keep alt text
+      .replace(/^\s*[-*+]\s+/gm, '') // Remove list markers
+      .replace(/^\s*\d+\.\s+/gm, '') // Remove numbered list markers
+      .replace(/^\s*>/gm, '') // Remove blockquotes
+      .replace(/---/g, '') // Remove horizontal rules
+      .replace(/\n+/g, ' ') // Replace newlines with spaces
+      .replace(/\s+/g, ' ') // Collapse multiple spaces
+      .trim();
+  };
+
+  // Speech synthesis handler
+  const handleSpeak = () => {
+    if (!result) return;
+    const synthesis = window.speechSynthesis;
+    if (!synthesis) return;
+
+    // Cancel any ongoing speech
+    synthesis.cancel();
+
+    const textToSpeak = stripMarkdown(result);
+    const utterance = new SpeechSynthesisUtterance(textToSpeak);
+    utterance.lang = lang === 'zh' ? 'zh-CN' : 'en-US';
+    synthesis.speak(utterance);
+  };
+
+  // Stop speech when panel closes
+  useEffect(() => {
+    if (!showPanel) {
+      window.speechSynthesis?.cancel();
+    }
+  }, [showPanel]);
+
   return (
     <>
       <style>{`
@@ -443,9 +489,7 @@ const ContentApp: React.FC = () => {
                 >
                   📋
                 </button>
-                <button style={actionButtonStyle} title={t.speakTitle[lang]}>🔊</button>
-                <button style={actionButtonStyle} title={t.likeTitle[lang]}>👍</button>
-                <button style={actionButtonStyle} title={t.dislikeTitle[lang]}>👎</button>
+                <button style={actionButtonStyle} onClick={handleSpeak} title={t.speakTitle[lang]}>🔊</button>
               </div>
             )}
           </div>
