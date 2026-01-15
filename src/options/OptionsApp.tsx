@@ -14,13 +14,13 @@ interface ProviderConfig {
 
 const PROVIDER_CONFIGS: Record<Provider, ProviderConfig> = {
   openai: {
-    name: { zh: 'OpenAI (GPT-4)', en: 'OpenAI (GPT-4)' },
+    name: { zh: 'OpenAI', en: 'OpenAI' },
     defaultBaseUrl: 'https://api.openai.com/v1/chat/completions',
     defaultModel: 'gpt-4o',
     storageKey: 'openai',
   },
   anthropic: {
-    name: { zh: 'Anthropic (Claude)', en: 'Anthropic (Claude)' },
+    name: { zh: 'Anthropic', en: 'Anthropic' },
     defaultBaseUrl: 'https://api.anthropic.com/v1/messages',
     defaultModel: 'claude-sonnet-4-20250514',
     storageKey: 'anthropic',
@@ -38,7 +38,7 @@ const PROVIDER_CONFIGS: Record<Provider, ProviderConfig> = {
     storageKey: 'deepseek',
   },
   glm: {
-    name: { zh: '智谱 AI (GLM-4)', en: 'Zhipu AI (GLM-4)' },
+    name: { zh: '智谱 AI', en: 'Zhipu AI' },
     defaultBaseUrl: 'https://open.bigmodel.cn/api/anthropic',
     defaultModel: 'glm-4.7',
     storageKey: 'glm',
@@ -51,7 +51,7 @@ function getDefaultTargetLanguage(): string {
 }
 
 const OptionsApp: React.FC = () => {
-  const [provider, setProvider] = useState<Provider>('minimax');
+  const [provider, setProvider] = useState<Provider>('openai');
   const [apiKey, setApiKey] = useState('');
   const [baseUrl, setBaseUrl] = useState(PROVIDER_CONFIGS.minimax.defaultBaseUrl);
   const [model, setModel] = useState(PROVIDER_CONFIGS.minimax.defaultModel);
@@ -441,6 +441,7 @@ const OptionsApp: React.FC = () => {
               <p style={hintStyle}>
                 {t.baseUrlHint[lang]}: {PROVIDER_CONFIGS[provider].defaultBaseUrl}
               </p>
+              <p style={hintStyle}>{t.baseUrlCustomHint[lang]}</p>
             </div>
           </div>
 
@@ -467,6 +468,7 @@ const OptionsApp: React.FC = () => {
                     e.target.style.boxShadow = 'none';
                   }}
                 />
+                <p style={hintStyle}>{t.modelCustomHint[lang]}</p>
               </div>
 
               <div>

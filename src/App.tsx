@@ -48,11 +48,11 @@ function App() {
 
   // Provider display names
   const providerNames: Record<Provider, { zh: string; en: string }> = {
-    openai: { zh: 'OpenAI (GPT-4)', en: 'OpenAI (GPT-4)' },
-    anthropic: { zh: 'Anthropic (Claude)', en: 'Anthropic (Claude)' },
+    openai: { zh: 'OpenAI', en: 'OpenAI' },
+    anthropic: { zh: 'Anthropic', en: 'Anthropic' },
     minimax: { zh: 'MiniMax', en: 'MiniMax' },
     deepseek: { zh: 'DeepSeek', en: 'DeepSeek' },
-    glm: { zh: '智谱 AI (GLM-4)', en: 'Zhipu AI (GLM-4)' },
+    glm: { zh: '智谱 AI', en: 'Zhipu AI' },
   };
 
   useEffect(() => {
@@ -63,7 +63,7 @@ function App() {
     // Check if chrome API is available (running in extension context)
     if (typeof chrome !== 'undefined' && chrome.storage) {
       chrome.storage.local.get(['selectedProvider'], async (result) => {
-        const selectedProvider = (result.selectedProvider as Provider) || 'minimax';
+        const selectedProvider = (result.selectedProvider as Provider) || 'openai';
         const config = PROVIDER_CONFIGS[selectedProvider];
         const storageKey = config.storageKey;
 

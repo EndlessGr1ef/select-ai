@@ -74,6 +74,17 @@ const API_CONFIGS: Record<Provider, ProviderApiConfig> = {
   },
 };
 
+function normalizeOpenAIEndpoint(baseUrl: string): string {
+  const trimmed = baseUrl.replace(/\/+$/, '');
+  if (/\/chat\/completions$/i.test(trimmed)) {
+    return trimmed;
+  }
+  if (trimmed.includes('/v1')) {
+    return `${trimmed}/chat/completions`;
+  }
+  return `${trimmed}/v1/chat/completions`;
+}
+
 chrome.runtime.onMessage.addListener((request, _sender, sendResponse) => {
   if (request.action === 'queryAI') {
     handleAIQuery(request.payload)
@@ -103,7 +114,7 @@ async function handleAIQuery(payload: {
 }): Promise<string> {
   const settings = await chrome.storage.local.get(['selectedProvider']);
 
-  const provider = (settings.selectedProvider as Provider) || 'minimax';
+  const provider = (settings.selectedProvider as Provider) || 'openai';
   const config = PROVIDER_CONFIGS[provider];
   const storageKey = config.storageKey;
 
@@ -137,12 +148,19 @@ async function handleAIQuery(payload: {
     ? `你是一个极简解释助手。用户在浏览网页时选中了一段文字进行查询。
 请结合提供的页面信息和上下文内容，对选中的文字进行精准、简练的解释和翻译。
 目标语言: ${targetLang}
-注意：输出的结果要先解释其本身的意思，再解释选中内容在上下文中的意思。`
+
+【重要规则】
+1. 直接给出解释内容，不要在回复中重复或引用原文（如"原文："、"选中内容："等）
+2. 先解释其本身的意思，再解释在上下文中的含义
+3. 保持回答简洁明了`
     : `You are a concise explanation assistant. The user has selected text while browsing a webpage.
 Based on the page information and context provided, give a precise and concise explanation or translation of the selected text.
 Target language: ${targetLang}
 
-Note: For output content please first explain ortranslate its base meaning, then explain its meaning in the context.`;
+【Important Rules】
+1. Provide the explanation directly without repeating or quoting the original text (no "Original:", "Selected text:", etc.)
+2. First explain its base meaning, then explain its meaning in the context
+3. Keep your response concise and clear`;
 
   const userPrompt = `<page>
   <url>${payload.pageUrl || 'unknown'}</url>
@@ -154,7 +172,9 @@ Note: For output content please first explain ortranslate its base meaning, then
 请解释上述选中内容。`;
 
   const apiConfig = API_CONFIGS[provider];
-  const endpoint = `${baseUrl}${apiConfig.endpointPath}`;
+  const endpoint = provider === 'openai'
+    ? normalizeOpenAIEndpoint(baseUrl)
+    : `${baseUrl}${apiConfig.endpointPath}`;
   const authHeader = apiConfig.authHeader === 'Bearer'
     ? `Bearer ${apiKey}`
     : apiKey;
