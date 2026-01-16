@@ -45,6 +45,14 @@ const PROVIDER_CONFIGS: Record<Provider, ProviderConfig> = {
   },
 };
 
+const PROVIDER_MODEL_OPTIONS: Record<Provider, string[]> = {
+  minimax: [],
+  deepseek: [],
+  glm: [],
+  openai: [],
+  anthropic: [],
+};
+
 // Get default output language from browser locale
 function getDefaultTargetLanguage(): string {
   return isBrowserChinese() ? '中文' : 'English';
@@ -89,6 +97,7 @@ const OptionsApp: React.FC = () => {
   }, [provider]);
 
   const t = translations.options;
+  const modelOptions = PROVIDER_MODEL_OPTIONS[provider] || [];
 
   const handleSave = () => {
     const providerStorageKey = PROVIDER_CONFIGS[provider].storageKey;
@@ -458,6 +467,7 @@ const OptionsApp: React.FC = () => {
                   type="text"
                   value={model}
                   onChange={(e) => setModel(e.target.value)}
+                  list={modelOptions.length ? 'model-options' : undefined}
                   style={inputStyle}
                   onFocus={(e) => {
                     e.target.style.borderColor = '#3b82f6';
@@ -468,6 +478,13 @@ const OptionsApp: React.FC = () => {
                     e.target.style.boxShadow = 'none';
                   }}
                 />
+                {modelOptions.length > 0 && (
+                  <datalist id="model-options">
+                    {modelOptions.map((modelOption) => (
+                      <option key={modelOption} value={modelOption} />
+                    ))}
+                  </datalist>
+                )}
                 <p style={hintStyle}>{t.modelCustomHint[lang]}</p>
               </div>
 

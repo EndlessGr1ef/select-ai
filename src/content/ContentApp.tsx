@@ -4,6 +4,8 @@ import { ContextExtractor } from '../utils/ContextExtractor';
 import { getUILanguage, isBrowserChinese } from '../utils/language';
 import { translations } from '../utils/i18n';
 
+type Provider = 'openai' | 'anthropic' | 'minimax' | 'deepseek' | 'glm';
+
 const ContentApp: React.FC = () => {
   const [selection, setSelection] = useState<string>('');
   const [position, setPosition] = useState<{ x: number; y: number }>({ x: 0, y: 0 });
@@ -13,7 +15,7 @@ const ContentApp: React.FC = () => {
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const defaultTargetLang = isBrowserChinese() ? '中文' : 'English';
-  const [modelName, setModelName] = useState('MiniMax-M2.1');
+  const [modelName, setModelName] = useState('gpt-4o');
   const [lang, setLang] = useState<'zh' | 'en'>('zh');
   const [targetLang, setTargetLang] = useState(defaultTargetLang);
   const [isTextExpanded, setIsTextExpanded] = useState(false);
@@ -31,6 +33,7 @@ const ContentApp: React.FC = () => {
 
   const panelRef = useRef<HTMLDivElement>(null);
   const dotRef = useRef<HTMLDivElement>(null);
+  const streamPortRef = useRef<chrome.runtime.Port | null>(null);
 
   const t = translations.content;
 
@@ -38,14 +41,22 @@ const ContentApp: React.FC = () => {
     setLang(getUILanguage());
   }, []);
 
+  const defaultModels: Record<Provider, string> = {
+    minimax: 'MiniMax-M2.1',
+    deepseek: 'deepseek-chat',
+    glm: 'glm-4.7',
+    anthropic: 'claude-sonnet-4-20250514',
+    openai: 'gpt-4o',
+  };
+
   // Load provider, model name, and output language
   useEffect(() => {
     const getProviderConfig = async () => {
       const result = await chrome.storage.local.get(['selectedProvider', 'targetLanguage']);
-      const provider = (result.selectedProvider as string) || 'minimax';
-      const modelKey = `${provider}Model`;
+      const providerValue = (result.selectedProvider as Provider) || 'openai';
+      const modelKey = `${providerValue}Model`;
       const modelResult = await chrome.storage.local.get([modelKey]);
-      setModelName((modelResult[modelKey] as string) || 'MiniMax-M2.1');
+      setModelName((modelResult[modelKey] as string) || defaultModels[providerValue]);
       setTargetLang((result.targetLanguage as string) || defaultTargetLang);
     };
     getProviderConfig();
@@ -54,11 +65,34 @@ const ContentApp: React.FC = () => {
       if (changes.targetLanguage) {
         setTargetLang((changes.targetLanguage.newValue as string) || defaultTargetLang);
       }
+      if (changes.selectedProvider) {
+        const providerValue = (changes.selectedProvider.newValue as Provider) || 'openai';
+        const modelKey = `${providerValue}Model`;
+        chrome.storage.local.get([modelKey], (modelResult) => {
+          setModelName((modelResult[modelKey] as string) || defaultModels[providerValue]);
+        });
+      }
+      if (changes.openaiModel || changes.anthropicModel || changes.minimaxModel || changes.deepseekModel || changes.glmModel) {
+        chrome.storage.local.get(['selectedProvider'], (result) => {
+          const providerValue = (result.selectedProvider as Provider) || 'openai';
+          const modelKey = `${providerValue}Model`;
+          chrome.storage.local.get([modelKey], (modelResult) => {
+            setModelName((modelResult[modelKey] as string) || defaultModels[providerValue]);
+          });
+        });
+      }
     };
 
     chrome.storage.onChanged.addListener(handleStorageChange);
     return () => chrome.storage.onChanged.removeListener(handleStorageChange);
   }, []);
+
+  const disconnectStreamPort = () => {
+    if (streamPortRef.current) {
+      streamPortRef.current.disconnect();
+      streamPortRef.current = null;
+    }
+  };
 
   // Drag handlers for panel repositioning
   const handleDragStart = (e: React.MouseEvent) => {
@@ -236,37 +270,31 @@ const ContentApp: React.FC = () => {
     }
 
     try {
-      chrome.runtime.sendMessage(
-        { action: 'queryAI', payload: { selection, context, pageUrl, pageTitle, targetLang, uiLang: lang } },
-        (response) => {
+      const payload = { selection, context, pageUrl, pageTitle, targetLang, uiLang: lang };
+
+      disconnectStreamPort();
+      const port = chrome.runtime.connect({ name: 'ai-stream' });
+      streamPortRef.current = port;
+
+      port.onMessage.addListener((message) => {
+        if (message?.type === 'delta') {
+          setResult((prev) => prev + (message.data || ''));
           setLoading(false);
-
-          // Check for Chrome runtime error first
-          if (chrome.runtime.lastError) {
-            const errorMsg = chrome.runtime.lastError.message || '';
-            console.error('[AI Search] Runtime error:', errorMsg);
-
-            // Handle extension context invalidated error
-            if (errorMsg.includes('Extension context invalidated') ||
-                errorMsg.includes('message port closed')) {
-              setError(t.extUpdated[lang]);
-            } else {
-              setError(errorMsg || 'Communication error');
-            }
-            return;
-          }
-
-          if (response?.error) {
-            console.error('%c[AI Search] Error:', 'color: #ef4444', response.error);
-            setError(response.error);
-          } else if (response?.data) {
-            setResult(response.data);
-          } else {
-            console.warn('[AI Search] Empty response received');
-            setError(t.noResponse[lang]);
-          }
+        } else if (message?.type === 'done') {
+          setLoading(false);
+        } else if (message?.type === 'error') {
+          setLoading(false);
+          setError(message.error || 'Streaming error');
         }
-      );
+      });
+
+      port.onDisconnect.addListener(() => {
+        streamPortRef.current = null;
+        setLoading(false);
+      });
+
+      port.postMessage({ action: 'queryAIStream', payload });
+      return;
     } catch (e) {
       console.error('[AI Search] Send failed:', e);
       setLoading(false);
@@ -278,6 +306,19 @@ const ContentApp: React.FC = () => {
       }
     }
   };
+
+  useEffect(() => {
+    if (!showPanel) {
+      disconnectStreamPort();
+      setLoading(false);
+    }
+  }, [showPanel]);
+
+  useEffect(() => {
+    return () => {
+      disconnectStreamPort();
+    };
+  }, []);
 
   // Styles
   const dotStyle: React.CSSProperties = {
@@ -624,66 +665,71 @@ const ContentApp: React.FC = () => {
             <div style={dividerStyle} />
 
             <div style={{ flex: 1, overflowY: 'auto', minHeight: 0 }}>
-              {loading ? (
-                <div style={loadingStyle}>
-                  <div style={spinnerStyle} />
-                  <span>{t.loading[lang]}</span>
-                </div>
-              ) : error ? (
+              {error ? (
                 <div style={errorStyle}>
                   <strong>{t.errorTitle[lang]}</strong> {error}
                 </div>
               ) : (
-                <div style={resultStyle}>
-                  <ReactMarkdown
-                    components={{
-                      p: ({ children }) => <p style={{ margin: '0 0 6px 0', lineHeight: 1.6 }}>{children}</p>,
-                      strong: ({ children }) => <strong style={{ fontWeight: 600, color: '#111827' }}>{children}</strong>,
-                      em: ({ children }) => <em style={{ fontStyle: 'italic' }}>{children}</em>,
-                      ul: ({ children }) => <ul style={{ margin: '4px 0', paddingLeft: 18 }}>{children}</ul>,
-                      ol: ({ children }) => <ol style={{ margin: '4px 0', paddingLeft: 18 }}>{children}</ol>,
-                      li: ({ children }) => <li style={{ marginBottom: 2 }}>{children}</li>,
-                      code: ({ children }) => (
-                        <code style={{
-                          backgroundColor: '#f3f4f6',
-                          padding: '1px 5px',
-                          borderRadius: 3,
-                          fontSize: 13,
-                          fontFamily: 'Monaco, Consolas, monospace'
-                        }}>{children}</code>
-                      ),
-                      pre: ({ children }) => (
-                        <pre style={{
-                          backgroundColor: '#f3f4f6',
-                          padding: 10,
-                          borderRadius: 6,
-                          overflow: 'auto',
-                          fontSize: 13,
-                          margin: '6px 0',
-                          fontFamily: 'Monaco, Consolas, monospace'
-                        }}>{children}</pre>
-                      ),
-                      h1: ({ children }) => <h1 style={{ fontSize: 16, fontWeight: 700, margin: '8px 0 4px' }}>{children}</h1>,
-                      h2: ({ children }) => <h2 style={{ fontSize: 15, fontWeight: 600, margin: '6px 0 3px' }}>{children}</h2>,
-                      h3: ({ children }) => <h3 style={{ fontSize: 14, fontWeight: 600, margin: '4px 0 2px' }}>{children}</h3>,
-                      a: ({ href, children }) => (
-                        <a href={href} target="_blank" rel="noopener noreferrer"
-                           style={{ color: '#3b82f6', textDecoration: 'underline' }}>{children}</a>
-                      ),
-                      blockquote: ({ children }) => (
-                        <blockquote style={{
-                          borderLeft: '3px solid #e5e7eb',
-                          paddingLeft: 10,
-                          margin: '4px 0',
-                          color: '#6b7280'
-                        }}>{children}</blockquote>
-                      ),
-                      br: () => <br style={{ lineHeight: 0.5 }} />,
-                    }}
-                  >
-                    {parseXmlResponse(result, lang)}
-                  </ReactMarkdown>
-                </div>
+                <>
+                  {loading && !result && (
+                    <div style={loadingStyle}>
+                      <div style={spinnerStyle} />
+                      <span>{t.loading[lang]}</span>
+                    </div>
+                  )}
+                  {(!loading || result) && (
+                    <div style={resultStyle}>
+                      <ReactMarkdown
+                        components={{
+                          p: ({ children }) => <p style={{ margin: '0 0 6px 0', lineHeight: 1.6 }}>{children}</p>,
+                          strong: ({ children }) => <strong style={{ fontWeight: 600, color: '#111827' }}>{children}</strong>,
+                          em: ({ children }) => <em style={{ fontStyle: 'italic' }}>{children}</em>,
+                          ul: ({ children }) => <ul style={{ margin: '4px 0', paddingLeft: 18 }}>{children}</ul>,
+                          ol: ({ children }) => <ol style={{ margin: '4px 0', paddingLeft: 18 }}>{children}</ol>,
+                          li: ({ children }) => <li style={{ marginBottom: 2 }}>{children}</li>,
+                          code: ({ children }) => (
+                            <code style={{
+                              backgroundColor: '#f3f4f6',
+                              padding: '1px 5px',
+                              borderRadius: 3,
+                              fontSize: 13,
+                              fontFamily: 'Monaco, Consolas, monospace'
+                            }}>{children}</code>
+                          ),
+                          pre: ({ children }) => (
+                            <pre style={{
+                              backgroundColor: '#f3f4f6',
+                              padding: 10,
+                              borderRadius: 6,
+                              overflow: 'auto',
+                              fontSize: 13,
+                              margin: '6px 0',
+                              fontFamily: 'Monaco, Consolas, monospace'
+                            }}>{children}</pre>
+                          ),
+                          h1: ({ children }) => <h1 style={{ fontSize: 16, fontWeight: 700, margin: '8px 0 4px' }}>{children}</h1>,
+                          h2: ({ children }) => <h2 style={{ fontSize: 15, fontWeight: 600, margin: '6px 0 3px' }}>{children}</h2>,
+                          h3: ({ children }) => <h3 style={{ fontSize: 14, fontWeight: 600, margin: '4px 0 2px' }}>{children}</h3>,
+                          a: ({ href, children }) => (
+                            <a href={href} target="_blank" rel="noopener noreferrer"
+                               style={{ color: '#3b82f6', textDecoration: 'underline' }}>{children}</a>
+                          ),
+                          blockquote: ({ children }) => (
+                            <blockquote style={{
+                              borderLeft: '3px solid #e5e7eb',
+                              paddingLeft: 10,
+                              margin: '4px 0',
+                              color: '#6b7280'
+                            }}>{children}</blockquote>
+                          ),
+                          br: () => <br style={{ lineHeight: 0.5 }} />,
+                        }}
+                      >
+                        {parseXmlResponse(result, lang)}
+                      </ReactMarkdown>
+                    </div>
+                  )}
+                </>
               )}
             </div>
 
