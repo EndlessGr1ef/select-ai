@@ -12,9 +12,9 @@ interface ProviderConfig {
 }
 
 interface ProviderApiConfig {
-  endpointPath: string;  // API endpoint 路径
-  authHeader: 'Bearer' | 'x-api-key';  // 认证方式
-  extraHeaders: Record<string, string>;  // 额外请求头
+  endpointPath: string;  // API endpoint path
+  authHeader: 'Bearer' | 'x-api-key';  // Authentication scheme
+  extraHeaders: Record<string, string>;  // Additional headers
 }
 
 const PROVIDER_CONFIGS: Record<Provider, ProviderConfig> = {
@@ -45,10 +45,10 @@ const PROVIDER_CONFIGS: Record<Provider, ProviderConfig> = {
   },
 };
 
-// API 请求配置（根据 provider 动态调整）
+// API request configuration (adjusted per provider)
 const API_CONFIGS: Record<Provider, ProviderApiConfig> = {
   openai: {
-    endpointPath: '',  // 完整路径已在 baseUrl 中
+    endpointPath: '',  // Full path is already included in baseUrl
     authHeader: 'Bearer',
     extraHeaders: {},
   },
@@ -74,36 +74,50 @@ const API_CONFIGS: Record<Provider, ProviderApiConfig> = {
   },
 };
 
-chrome.runtime.onMessage.addListener((request, _sender, sendResponse) => {
-  if (request.action === 'queryAI') {
-    handleAIQuery(request.payload)
-      .then(result => {
-        sendResponse({ data: result });
-      })
-      .catch(error => {
-        console.error('[AI Search] Query error:', error);
-        sendResponse({ error: error.message || String(error) });
-      });
-
-    return true;
+function normalizeOpenAIEndpoint(baseUrl: string): string {
+  const trimmed = baseUrl.replace(/\/+$/, '');
+  if (/\/chat\/completions$/i.test(trimmed)) {
+    return trimmed;
   }
-
-  return false;
-});
+  if (trimmed.includes('/v1')) {
+    return `${trimmed}/chat/completions`;
+  }
+  return `${trimmed}/v1/chat/completions`;
+}
 
 // Maximum context length sent to API (in characters)
 const MAX_CONTEXT_FOR_API = 2000;
 
-async function handleAIQuery(payload: {
+import { isBrowserChinese } from '../utils/language';
+
+type QueryPayload = {
   selection: string;
   context: string;
   pageUrl?: string;
   pageTitle?: string;
-  targetLang?: 'zh' | 'en';
-}): Promise<string> {
+  targetLang?: string;
+  uiLang?: 'zh' | 'en';
+};
+
+type RequestConfig = {
+  provider: Provider;
+  streamFormat: StreamFormat;
+  endpoint: string;
+  headers: Record<string, string>;
+  requestBody: Record<string, unknown>;
+  isChineseUI: boolean;
+};
+
+type StreamFormat = 'openai' | 'anthropic';
+
+function getStreamFormat(provider: Provider): StreamFormat {
+  return provider === 'openai' || provider === 'deepseek' ? 'openai' : 'anthropic';
+}
+
+async function buildRequestConfig(payload: QueryPayload): Promise<RequestConfig> {
   const settings = await chrome.storage.local.get(['selectedProvider']);
 
-  const provider = (settings.selectedProvider as Provider) || 'minimax';
+  const provider = (settings.selectedProvider as Provider) || 'openai';
   const config = PROVIDER_CONFIGS[provider];
   const storageKey = config.storageKey;
 
@@ -119,10 +133,14 @@ async function handleAIQuery(payload: {
   const apiKey = providerSettings[`${storageKey}ApiKey`] as string | undefined;
   const baseUrl = (providerSettings[`${storageKey}BaseUrl`] as string) || config.defaultBaseUrl;
   const model = (providerSettings[`${storageKey}Model`] as string) || config.defaultModel;
-  const targetLang = (providerSettings.targetLanguage as string) || '中文';
+  const targetLang = (providerSettings.targetLanguage as string)
+    || payload.targetLang
+    || (isBrowserChinese() ? '中文' : 'English');
+
+  const isChineseUI = payload.uiLang ? payload.uiLang === 'zh' : payload.targetLang !== 'en';
 
   if (!apiKey) {
-    throw new Error(payload.targetLang === 'en' ? 'Please configure API Key in settings' : '请先在设置页面配置 API Key');
+    throw new Error(isChineseUI ? '请先在设置页面配置 API Key' : 'Please configure API Key in settings');
   }
 
   // Prepare context (truncate if needed)
@@ -130,38 +148,52 @@ async function handleAIQuery(payload: {
     ? payload.context.substring(0, MAX_CONTEXT_FOR_API) + '...'
     : payload.context;
 
-  // Use UI language to determine system prompt language
-  const isChineseUI = payload.targetLang !== 'en';
+  const isChineseTarget = targetLang.startsWith('中文') || targetLang.toLowerCase().startsWith('zh');
 
-  const systemPrompt = isChineseUI
-    ? `你是一个极简解释助手。用户在浏览网页时选中了一段文字进行查询。
-请结合提供的页面信息和上下文内容，对选中的文字进行精准、简练的解释和翻译。
-目标语言: ${targetLang}
-注意：输出的结果要先解释其本身的意思，再解释选中内容在上下文中的意思。`
-    : `You are a concise explanation assistant. The user has selected text while browsing a webpage.
-Based on the page information and context provided, give a precise and concise explanation or translation of the selected text.
-Target language: ${targetLang}
+  const systemPrompt = isChineseTarget
+    ? `你是一个极简解释助手。用户在浏览网页时选中了一段文字进行查询。请结合提供的页面信息和上下文内容，对选中的文字进行精准、简练的解释和翻译。
 
-Note: For output content please first explain ortranslate its base meaning, then explain its meaning in the context.`;
+【必须遵守的规则】
+1. 直接给出解释内容，不要重复或引用原文;
+2. 保持回答简洁，不要冗长;
+3. 必须严格按以下格式输出回复;
+   基础含义:xxx
+   上下文中的含义:xxx
+4. 请以陈述句回答, 回答内容限制在1000tokens以内;
+5. 用中文回答,按markdown格式美化输出;
+6. 禁止使用代码块、内联代码或HTML标签(例如: \`\`\`、\`code\`、<tag>)`
+    : `You are a concise explanation assistant. The user has selected text while browsing a webpage. Based on the page information and context provided, give a precise and concise explanation or translation of the selected text.
+
+【Must follow rules】
+1. Provide the explanation directly without repeating or quoting the original text;
+2. Keep your response concise, avoid verbosity;
+3. You MUST output in the following format only, nothing else:
+   Base meaning: xxx;
+   Contextual meaning: xxx;
+4. Answer in a declarative sentence, the response content should be less than 1000 tokens;
+5. Respond in ${targetLang}, beautify the output in markdown format;
+6. Do not use code blocks, inline code, or HTML tags (e.g., \`\`\` or \`code\` or <tag>)`;
 
   const userPrompt = `<page>
-  <url>${payload.pageUrl || 'unknown'}</url>
-  <title>${payload.pageTitle || 'unknown'}</title>
+<url>${payload.pageUrl || 'unknown'}</url>
+<title>${payload.pageTitle || 'unknown'}</title>
 </page>
 <context>${contextForApi}</context>
 <selection>${payload.selection}</selection>
 
-请解释上述选中内容。`;
+${isChineseTarget ? '请解释上面选中的内容。' : 'Please explain the selected text above.'}`;
 
   const apiConfig = API_CONFIGS[provider];
-  const endpoint = `${baseUrl}${apiConfig.endpointPath}`;
+  const endpoint = provider === 'openai'
+    ? normalizeOpenAIEndpoint(baseUrl)
+    : `${baseUrl}${apiConfig.endpointPath}`;
   const authHeader = apiConfig.authHeader === 'Bearer'
     ? `Bearer ${apiKey}`
     : apiKey;
 
-  // OpenAI 需要将 system 放在 messages 数组中
-  const isOpenAI = provider === 'openai';
-  const requestBody = isOpenAI
+  // OpenAI-compatible providers require system inside messages
+  const streamFormat = getStreamFormat(provider);
+  const requestBody = streamFormat === 'openai'
     ? {
         model: model,
         max_tokens: 1024,
@@ -170,7 +202,7 @@ Note: For output content please first explain ortranslate its base meaning, then
           { role: 'system', content: systemPrompt },
           { role: 'user', content: userPrompt }
         ],
-        stream: false
+        stream: true
       }
     : {
         model: model,
@@ -180,85 +212,196 @@ Note: For output content please first explain ortranslate its base meaning, then
         messages: [
           { role: 'user', content: userPrompt }
         ],
-        stream: false
+        stream: true
       };
 
-  const response = await fetch(endpoint, {
-    method: 'POST',
-    headers: {
-      'Content-Type': 'application/json',
-      [apiConfig.authHeader === 'Bearer' ? 'Authorization' : 'x-api-key']: authHeader,
-      ...apiConfig.extraHeaders,
-    },
-    body: JSON.stringify(requestBody)
-  });
+  const headers: Record<string, string> = {
+    'Content-Type': 'application/json',
+    [apiConfig.authHeader === 'Bearer' ? 'Authorization' : 'x-api-key']: authHeader,
+    ...apiConfig.extraHeaders,
+  };
 
-
-  if (!response.ok) {
-    let errorMessage = `HTTP ${response.status}`;
-    try {
-      const errorData = await response.json();
-      errorMessage = errorData.error?.message || errorData.message || JSON.stringify(errorData);
-    } catch {
-      errorMessage = await response.text() || errorMessage;
-    }
-    throw new Error(errorMessage);
-  }
-
-  const data = await response.json();
-  
-  // Try multiple response formats
-  
-  // Format 1: Anthropic/MiniMax format with content array
-  if (data.content && Array.isArray(data.content)) {
-    // Look for text field first (standard Anthropic)
-    for (const item of data.content) {
-      if (item.text) {
-        return item.text;
-      }
-    }
-    // If no text, check for thinking field (MiniMax extended thinking)
-    for (const item of data.content) {
-      if (item.thinking) {
-        // If only thinking is present, use it as the response
-        return item.thinking;
-      }
-    }
-    // Try to get any string content
-    if (data.content[0] && typeof data.content[0] === 'string') {
-      return data.content[0];
-    }
-  }
-  
-  // Format 2: OpenAI format
-  if (data.choices && data.choices[0] && data.choices[0].message) {
-    return data.choices[0].message.content;
-  }
-  
-  // Format 3: Direct text response
-  if (data.text) {
-    return data.text;
-  }
-  
-  // Format 4: Message format
-  if (data.message && typeof data.message === 'string') {
-    return data.message;
-  }
-
-  // Format 5: Result format
-  if (data.result) {
-    return typeof data.result === 'string' ? data.result : JSON.stringify(data.result);
-  }
-  
-  // Format 6: Output format
-  if (data.output) {
-    return typeof data.output === 'string' ? data.output : JSON.stringify(data.output);
-  }
-
-  // Log and throw with actual response for debugging
-  const isChineseError = payload.targetLang !== 'en';
-  throw new Error(
-    (isChineseError ? 'API 返回格式异常: ' : 'API response format error: ') +
-    JSON.stringify(data).substring(0, 300)
-  );
+  return {
+    provider,
+    streamFormat,
+    endpoint,
+    headers,
+    requestBody,
+    isChineseUI
+  };
 }
+
+async function readErrorMessage(response: Response): Promise<string> {
+  let errorMessage = `HTTP ${response.status}`;
+  try {
+    const errorData = await response.json();
+    errorMessage = errorData.error?.message || errorData.message || JSON.stringify(errorData);
+  } catch {
+    errorMessage = await response.text() || errorMessage;
+  }
+  return errorMessage;
+}
+
+type StreamParseResult = {
+  delta?: string;
+  done?: boolean;
+};
+
+function parseOpenAIStreamPayload(data: unknown): StreamParseResult {
+  const parsed = data as { choices?: Array<{ delta?: { content?: string }, finish_reason?: string | null }> };
+  const delta = parsed?.choices?.[0]?.delta?.content;
+  const finishReason = parsed?.choices?.[0]?.finish_reason;
+  return {
+    delta: typeof delta === 'string' && delta.length > 0 ? delta : undefined,
+    done: typeof finishReason === 'string' && finishReason.length > 0 ? true : undefined
+  };
+}
+
+function parseAnthropicStreamPayload(data: unknown): StreamParseResult {
+  const parsed = data as {
+    type?: string;
+    delta?: { text?: string; stop_reason?: string | null };
+    content_block?: { text?: string };
+    content?: Array<{ text?: string }>;
+    text?: string;
+  };
+  if (parsed?.type === 'content_block_delta') {
+    const deltaText = parsed?.delta?.text;
+    return { delta: typeof deltaText === 'string' && deltaText.length > 0 ? deltaText : undefined };
+  }
+  if (parsed?.type === 'content_block_start') {
+    const blockText = parsed?.content_block?.text;
+    return { delta: typeof blockText === 'string' && blockText.length > 0 ? blockText : undefined };
+  }
+  if (parsed?.type === 'message_delta' && parsed?.delta?.stop_reason) {
+    return { done: true };
+  }
+  if (parsed?.type === 'message_stop') {
+    return { done: true };
+  }
+  if (typeof parsed?.text === 'string' && parsed.text.length > 0) {
+    return { delta: parsed.text };
+  }
+  if (parsed?.content?.[0]?.text && typeof parsed.content[0].text === 'string') {
+    return { delta: parsed.content[0].text };
+  }
+  return {};
+}
+
+async function handleAIStream(payload: QueryPayload, port: chrome.runtime.Port): Promise<void> {
+  const { streamFormat, endpoint, headers, requestBody, isChineseUI } = await buildRequestConfig(payload);
+
+  const controller = new AbortController();
+  const onDisconnect = () => controller.abort();
+  port.onDisconnect.addListener(onDisconnect);
+
+  let doneSent = false;
+
+  try {
+    console.log('[AI Search] requestBody (stream):', JSON.stringify(requestBody, null, 2));
+
+    const response = await fetch(endpoint, {
+      method: 'POST',
+      headers,
+      body: JSON.stringify(requestBody),
+      signal: controller.signal
+    });
+
+    if (!response.ok) {
+      throw new Error(await readErrorMessage(response));
+    }
+
+    const reader = response.body?.getReader();
+    if (!reader) {
+      throw new Error(isChineseUI ? '无法读取流式响应' : 'Unable to read streaming response');
+    }
+
+    const decoder = new TextDecoder();
+    let buffer = '';
+
+    while (true) {
+      const { value, done } = await reader.read();
+      if (done) break;
+
+      buffer += decoder.decode(value, { stream: true });
+      const lines = buffer.split(/\r?\n/);
+      buffer = lines.pop() || '';
+
+      for (const line of lines) {
+        const trimmed = line.trim();
+        if (!trimmed || !trimmed.startsWith('data:')) continue;
+
+        const data = trimmed.slice(5).trim();
+        if (data === '[DONE]') {
+          doneSent = true;
+          port.postMessage({ type: 'done' });
+          return;
+        }
+
+        try {
+          const parsed = JSON.parse(data);
+          const result = streamFormat === 'openai'
+            ? parseOpenAIStreamPayload(parsed)
+            : parseAnthropicStreamPayload(parsed);
+          if (result.delta) {
+            port.postMessage({ type: 'delta', data: result.delta });
+          }
+          if (result.done) {
+            doneSent = true;
+            port.postMessage({ type: 'done' });
+            return;
+          }
+        } catch (error) {
+          console.warn('[AI Search] Stream chunk parse error:', error);
+        }
+      }
+    }
+
+    const remaining = buffer.trim();
+    if (remaining.startsWith('data:')) {
+      const data = remaining.slice(5).trim();
+      if (data === '[DONE]') {
+        doneSent = true;
+        port.postMessage({ type: 'done' });
+        return;
+      }
+      try {
+        const parsed = JSON.parse(data);
+        const result = streamFormat === 'openai'
+          ? parseOpenAIStreamPayload(parsed)
+          : parseAnthropicStreamPayload(parsed);
+        if (result.delta) {
+          port.postMessage({ type: 'delta', data: result.delta });
+        }
+        if (result.done) {
+          doneSent = true;
+          port.postMessage({ type: 'done' });
+          return;
+        }
+      } catch (error) {
+        console.warn('[AI Search] Stream tail parse error:', error);
+      }
+    }
+  } catch (error) {
+    if ((error as Error).name !== 'AbortError') {
+      port.postMessage({ type: 'error', error: (error as Error).message || String(error) });
+    }
+  } finally {
+    port.onDisconnect.removeListener(onDisconnect);
+    if (!doneSent) {
+      port.postMessage({ type: 'done' });
+    }
+  }
+}
+
+chrome.runtime.onConnect.addListener((port) => {
+  if (port.name !== 'ai-stream') return;
+
+  port.onMessage.addListener((message) => {
+    if (message?.action === 'queryAIStream') {
+      handleAIStream(message.payload as QueryPayload, port).catch((error) => {
+        port.postMessage({ type: 'error', error: error.message || String(error) });
+      });
+    }
+  });
+});

@@ -1,4 +1,4 @@
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, useRef } from 'react';
 import { getUILanguage, isBrowserChinese } from '../utils/language';
 import { translations } from '../utils/i18n';
 
@@ -14,15 +14,15 @@ interface ProviderConfig {
 
 const PROVIDER_CONFIGS: Record<Provider, ProviderConfig> = {
   openai: {
-    name: { zh: 'OpenAI (GPT-4)', en: 'OpenAI (GPT-4)' },
+    name: { zh: 'OpenAI', en: 'OpenAI' },
     defaultBaseUrl: 'https://api.openai.com/v1/chat/completions',
     defaultModel: 'gpt-4o',
     storageKey: 'openai',
   },
   anthropic: {
-    name: { zh: 'Anthropic (Claude)', en: 'Anthropic (Claude)' },
+    name: { zh: 'Anthropic', en: 'Anthropic' },
     defaultBaseUrl: 'https://api.anthropic.com/v1/messages',
-    defaultModel: 'claude-sonnet-4-20250514',
+    defaultModel: 'claude-sonnet-4-5',
     storageKey: 'anthropic',
   },
   minimax: {
@@ -38,20 +38,43 @@ const PROVIDER_CONFIGS: Record<Provider, ProviderConfig> = {
     storageKey: 'deepseek',
   },
   glm: {
-    name: { zh: '智谱 AI (GLM-4)', en: 'Zhipu AI (GLM-4)' },
+    name: { zh: '智谱 AI', en: 'Zhipu AI' },
     defaultBaseUrl: 'https://open.bigmodel.cn/api/anthropic',
     defaultModel: 'glm-4.7',
     storageKey: 'glm',
   },
 };
 
-// 根据浏览器语言获取默认输出语言
+const PROVIDER_MODEL_OPTIONS: Record<Provider, string[]> = {
+  openai: [
+    'gpt-4o',
+    'gpt-4-turbo',
+    'gpt-4',
+  ],
+  anthropic: [
+    'claude-sonnet-4-5',
+    'claude-haiku-4-5',
+    'claude-opus-4-5',
+  ],
+  deepseek: [
+    'deepseek-chat',
+    'deepseek-reasoner',
+  ],
+  minimax: [
+    'MiniMax-M2.1',
+  ],
+  glm: [
+    'glm-4.7',
+  ],
+};
+
+// Get default output language from browser locale
 function getDefaultTargetLanguage(): string {
   return isBrowserChinese() ? '中文' : 'English';
 }
 
 const OptionsApp: React.FC = () => {
-  const [provider, setProvider] = useState<Provider>('minimax');
+  const [provider, setProvider] = useState<Provider>('openai');
   const [apiKey, setApiKey] = useState('');
   const [baseUrl, setBaseUrl] = useState(PROVIDER_CONFIGS.minimax.defaultBaseUrl);
   const [model, setModel] = useState(PROVIDER_CONFIGS.minimax.defaultModel);
@@ -60,6 +83,8 @@ const OptionsApp: React.FC = () => {
   const [lang, setLang] = useState<'zh' | 'en'>('zh');
   const [showApiKey, setShowApiKey] = useState(false);
   const [isLoading, setIsLoading] = useState(true);
+  const [showModelOptions, setShowModelOptions] = useState(false);
+  const modelBlurTimeoutRef = useRef<number | null>(null);
 
   // Initialize: load language and selected provider
   useEffect(() => {
@@ -89,6 +114,7 @@ const OptionsApp: React.FC = () => {
   }, [provider]);
 
   const t = translations.options;
+  const modelOptions = PROVIDER_MODEL_OPTIONS[provider] || [];
 
   const handleSave = () => {
     const providerStorageKey = PROVIDER_CONFIGS[provider].storageKey;
@@ -207,6 +233,31 @@ const OptionsApp: React.FC = () => {
     backgroundPosition: 'right 12px center',
     backgroundSize: 20,
     paddingRight: 44,
+  };
+
+  const modelInputWrapperStyle: React.CSSProperties = {
+    position: 'relative',
+  };
+
+  const modelOptionsStyle: React.CSSProperties = {
+    position: 'absolute',
+    top: '100%',
+    left: 0,
+    right: 0,
+    marginTop: 8,
+    backgroundColor: '#fff',
+    border: '1px solid #e5e7eb',
+    borderRadius: 12,
+    boxShadow: '0 12px 24px rgba(0,0,0,0.12)',
+    maxHeight: 220,
+    overflowY: 'auto',
+    zIndex: 20,
+  };
+
+  const modelOptionItemStyle: React.CSSProperties = {
+    padding: '10px 14px',
+    fontSize: 14,
+    cursor: 'pointer',
   };
 
   const hintStyle: React.CSSProperties = {
@@ -441,6 +492,7 @@ const OptionsApp: React.FC = () => {
               <p style={hintStyle}>
                 {t.baseUrlHint[lang]}: {PROVIDER_CONFIGS[provider].defaultBaseUrl}
               </p>
+              <p style={hintStyle}>{t.baseUrlCustomHint[lang]}</p>
             </div>
           </div>
 
@@ -453,20 +505,56 @@ const OptionsApp: React.FC = () => {
             <div style={rowStyle}>
               <div>
                 <label style={labelStyle}>{t.modelLabel[lang]}</label>
-                <input
-                  type="text"
-                  value={model}
-                  onChange={(e) => setModel(e.target.value)}
-                  style={inputStyle}
-                  onFocus={(e) => {
-                    e.target.style.borderColor = '#3b82f6';
-                    e.target.style.boxShadow = '0 0 0 3px rgba(59,130,246,0.1)';
-                  }}
-                  onBlur={(e) => {
-                    e.target.style.borderColor = '#e5e7eb';
-                    e.target.style.boxShadow = 'none';
-                  }}
-                />
+                <div style={modelInputWrapperStyle}>
+                  <input
+                    type="text"
+                    value={model}
+                    onChange={(e) => setModel(e.target.value)}
+                    style={inputStyle}
+                    onFocus={(e) => {
+                      if (modelBlurTimeoutRef.current) {
+                        window.clearTimeout(modelBlurTimeoutRef.current);
+                        modelBlurTimeoutRef.current = null;
+                      }
+                      setShowModelOptions(true);
+                      e.target.style.borderColor = '#3b82f6';
+                      e.target.style.boxShadow = '0 0 0 3px rgba(59,130,246,0.1)';
+                    }}
+                    onBlur={(e) => {
+                      e.target.style.borderColor = '#e5e7eb';
+                      e.target.style.boxShadow = 'none';
+                      modelBlurTimeoutRef.current = window.setTimeout(() => {
+                        setShowModelOptions(false);
+                      }, 120);
+                    }}
+                  />
+                  {showModelOptions && modelOptions.length > 0 && (
+                    <div style={modelOptionsStyle}>
+                      {modelOptions.map((modelOption) => (
+                        <div
+                          key={modelOption}
+                          role="option"
+                          aria-selected={modelOption === model}
+                          style={modelOptionItemStyle}
+                          onMouseDown={(e) => {
+                            e.preventDefault();
+                            setModel(modelOption);
+                            setShowModelOptions(false);
+                          }}
+                          onMouseEnter={(e) => {
+                            e.currentTarget.style.backgroundColor = '#f3f4f6';
+                          }}
+                          onMouseLeave={(e) => {
+                            e.currentTarget.style.backgroundColor = '#fff';
+                          }}
+                        >
+                          {modelOption}
+                        </div>
+                      ))}
+                    </div>
+                  )}
+                </div>
+                <p style={hintStyle}>{t.modelCustomHint[lang]}</p>
               </div>
 
               <div>

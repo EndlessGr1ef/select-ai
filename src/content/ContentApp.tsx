@@ -1,8 +1,10 @@
 import React, { useState, useEffect, useRef } from 'react';
 import ReactMarkdown from 'react-markdown';
 import { ContextExtractor } from '../utils/ContextExtractor';
-import { getUILanguage } from '../utils/language';
+import { getUILanguage, isBrowserChinese } from '../utils/language';
 import { translations } from '../utils/i18n';
+
+type Provider = 'openai' | 'anthropic' | 'minimax' | 'deepseek' | 'glm';
 
 const ContentApp: React.FC = () => {
   const [selection, setSelection] = useState<string>('');
@@ -12,8 +14,17 @@ const ContentApp: React.FC = () => {
   const [result, setResult] = useState<string>('');
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
-  const [modelName, setModelName] = useState('MiniMax-M2.1');
+  const defaultTargetLang = isBrowserChinese() ? '中文' : 'English';
+  const [modelName, setModelName] = useState('gpt-4o');
   const [lang, setLang] = useState<'zh' | 'en'>('zh');
+  const [targetLang, setTargetLang] = useState(defaultTargetLang);
+  const [isTextExpanded, setIsTextExpanded] = useState(false);
+
+  // Resize state for panel
+  const [panelSize, setPanelSize] = useState<{ width: number; height: number }>({ width: 400, height: 450 });
+  const [isResizing, setIsResizing] = useState(false);
+  const [resizeDirection, setResizeDirection] = useState<'n' | 's' | 'e' | 'w' | 'ne' | 'nw' | 'se' | 'sw' | null>(null);
+  const resizeStartRef = useRef<{ mouseX: number; mouseY: number; startWidth: number; startHeight: number; startX: number; startY: number } | null>(null);
 
   // Drag state for panel repositioning
   const [dragOffset, setDragOffset] = useState<{ x: number; y: number }>({ x: 0, y: 0 });
@@ -22,6 +33,7 @@ const ContentApp: React.FC = () => {
 
   const panelRef = useRef<HTMLDivElement>(null);
   const dotRef = useRef<HTMLDivElement>(null);
+  const streamPortRef = useRef<chrome.runtime.Port | null>(null);
 
   const t = translations.content;
 
@@ -29,17 +41,58 @@ const ContentApp: React.FC = () => {
     setLang(getUILanguage());
   }, []);
 
-  // 获取当前 provider 和模型名称
+  const defaultModels: Record<Provider, string> = {
+    minimax: 'MiniMax-M2.1',
+    deepseek: 'deepseek-chat',
+    glm: 'glm-4.7',
+    anthropic: 'claude-sonnet-4-20250514',
+    openai: 'gpt-4o',
+  };
+
+  // Load provider, model name, and output language
   useEffect(() => {
     const getProviderConfig = async () => {
-      const result = await chrome.storage.local.get(['selectedProvider']);
-      const provider = (result.selectedProvider as string) || 'minimax';
-      const modelKey = `${provider}Model`;
+      const result = await chrome.storage.local.get(['selectedProvider', 'targetLanguage']);
+      const providerValue = (result.selectedProvider as Provider) || 'openai';
+      const modelKey = `${providerValue}Model`;
       const modelResult = await chrome.storage.local.get([modelKey]);
-      setModelName((modelResult[modelKey] as string) || 'MiniMax-M2.1');
+      setModelName((modelResult[modelKey] as string) || defaultModels[providerValue]);
+      setTargetLang((result.targetLanguage as string) || defaultTargetLang);
     };
     getProviderConfig();
+
+    const handleStorageChange = (changes: { [key: string]: chrome.storage.StorageChange }) => {
+      if (changes.targetLanguage) {
+        setTargetLang((changes.targetLanguage.newValue as string) || defaultTargetLang);
+      }
+      if (changes.selectedProvider) {
+        const providerValue = (changes.selectedProvider.newValue as Provider) || 'openai';
+        const modelKey = `${providerValue}Model`;
+        chrome.storage.local.get([modelKey], (modelResult) => {
+          setModelName((modelResult[modelKey] as string) || defaultModels[providerValue]);
+        });
+      }
+      if (changes.openaiModel || changes.anthropicModel || changes.minimaxModel || changes.deepseekModel || changes.glmModel) {
+        chrome.storage.local.get(['selectedProvider'], (result) => {
+          const providerValue = (result.selectedProvider as Provider) || 'openai';
+          const modelKey = `${providerValue}Model`;
+          chrome.storage.local.get([modelKey], (modelResult) => {
+            setModelName((modelResult[modelKey] as string) || defaultModels[providerValue]);
+          });
+        });
+      }
+    };
+
+    chrome.storage.onChanged.addListener(handleStorageChange);
+    return () => chrome.storage.onChanged.removeListener(handleStorageChange);
   }, []);
+
+  const disconnectStreamPort = () => {
+    if (streamPortRef.current) {
+      streamPortRef.current.disconnect();
+      streamPortRef.current = null;
+    }
+  };
 
   // Drag handlers for panel repositioning
   const handleDragStart = (e: React.MouseEvent) => {
@@ -83,8 +136,84 @@ const ContentApp: React.FC = () => {
     };
   }, [isDragging]);
 
+  // Resize handlers for panel
+  const handleResizeStart = (e: React.MouseEvent, direction: 'n' | 's' | 'e' | 'w' | 'ne' | 'nw' | 'se' | 'sw') => {
+    e.preventDefault();
+    e.stopPropagation();
+    setIsResizing(true);
+    setResizeDirection(direction);
+    
+    const panelRect = panelRef.current?.getBoundingClientRect();
+    if (!panelRect) return;
+    
+    resizeStartRef.current = {
+      mouseX: e.clientX,
+      mouseY: e.clientY,
+      startWidth: panelSize.width,
+      startHeight: panelSize.height,
+      startX: dragOffset.x,
+      startY: dragOffset.y,
+    };
+  };
+
+  useEffect(() => {
+    if (!isResizing || !resizeDirection) return;
+
+    const handleResizeMove = (e: MouseEvent) => {
+      if (!resizeStartRef.current) return;
+
+      const deltaX = e.clientX - resizeStartRef.current.mouseX;
+      const deltaY = e.clientY - resizeStartRef.current.mouseY;
+
+      let newWidth = resizeStartRef.current.startWidth;
+      let newHeight = resizeStartRef.current.startHeight;
+      let newOffsetX = resizeStartRef.current.startX;
+      let newOffsetY = resizeStartRef.current.startY;
+
+      // Handle horizontal resize
+      if (resizeDirection.includes('e')) {
+        newWidth = Math.max(300, Math.min(800, resizeStartRef.current.startWidth + deltaX));
+      } else if (resizeDirection.includes('w')) {
+        const potentialWidth = resizeStartRef.current.startWidth - deltaX;
+        if (potentialWidth >= 300 && potentialWidth <= 800) {
+          newWidth = potentialWidth;
+          newOffsetX = resizeStartRef.current.startX + deltaX;
+        }
+      }
+
+      // Handle vertical resize
+      if (resizeDirection.includes('s')) {
+        newHeight = Math.max(300, Math.min(700, resizeStartRef.current.startHeight + deltaY));
+      } else if (resizeDirection.includes('n')) {
+        const potentialHeight = resizeStartRef.current.startHeight - deltaY;
+        if (potentialHeight >= 300 && potentialHeight <= 700) {
+          newHeight = potentialHeight;
+          newOffsetY = resizeStartRef.current.startY + deltaY;
+        }
+      }
+
+      setPanelSize({ width: newWidth, height: newHeight });
+      setDragOffset({ x: newOffsetX, y: newOffsetY });
+    };
+
+    const handleResizeEnd = () => {
+      setIsResizing(false);
+      setResizeDirection(null);
+      resizeStartRef.current = null;
+    };
+
+    document.addEventListener('mousemove', handleResizeMove);
+    document.addEventListener('mouseup', handleResizeEnd);
+
+    return () => {
+      document.removeEventListener('mousemove', handleResizeMove);
+      document.removeEventListener('mouseup', handleResizeEnd);
+    };
+  }, [isResizing, resizeDirection]);
+
   useEffect(() => {
     const handleMouseUp = (e: MouseEvent) => {
+      if (isResizing || isDragging) return;
       // Ignore if clicking on our own elements
       if (dotRef.current?.contains(e.target as Node) || panelRef.current?.contains(e.target as Node)) {
         return;
@@ -116,7 +245,7 @@ const ContentApp: React.FC = () => {
 
     document.addEventListener('mouseup', handleMouseUp);
     return () => document.removeEventListener('mouseup', handleMouseUp);
-  }, [loading]);
+  }, [loading, isResizing, isDragging]);
 
   const handleTriggerQuery = () => {
     setShowDot(false);
@@ -124,8 +253,10 @@ const ContentApp: React.FC = () => {
     setLoading(true);
     setError(null);
     setResult('');
-    // Reset drag offset when panel opens
+    setIsTextExpanded(false);
+    // Reset drag offset and size when panel opens
     setDragOffset({ x: 0, y: 0 });
+    setPanelSize({ width: 400, height: 450 });
 
     const sel = window.getSelection();
     const context = sel ? ContextExtractor.getContext(sel) : '';
@@ -140,37 +271,31 @@ const ContentApp: React.FC = () => {
     }
 
     try {
-      chrome.runtime.sendMessage(
-        { action: 'queryAI', payload: { selection, context, pageUrl, pageTitle, targetLang: lang } },
-        (response) => {
+      const payload = { selection, context, pageUrl, pageTitle, targetLang, uiLang: lang };
+
+      disconnectStreamPort();
+      const port = chrome.runtime.connect({ name: 'ai-stream' });
+      streamPortRef.current = port;
+
+      port.onMessage.addListener((message) => {
+        if (message?.type === 'delta') {
+          setResult((prev) => prev + (message.data || ''));
           setLoading(false);
-
-          // Check for Chrome runtime error first
-          if (chrome.runtime.lastError) {
-            const errorMsg = chrome.runtime.lastError.message || '';
-            console.error('[AI Search] Runtime error:', errorMsg);
-
-            // Handle extension context invalidated error
-            if (errorMsg.includes('Extension context invalidated') ||
-                errorMsg.includes('message port closed')) {
-              setError(t.extUpdated[lang]);
-            } else {
-              setError(errorMsg || 'Communication error');
-            }
-            return;
-          }
-
-          if (response?.error) {
-            console.error('%c[AI Search] Error:', 'color: #ef4444', response.error);
-            setError(response.error);
-          } else if (response?.data) {
-            setResult(response.data);
-          } else {
-            console.warn('[AI Search] Empty response received');
-            setError(t.noResponse[lang]);
-          }
+        } else if (message?.type === 'done') {
+          setLoading(false);
+        } else if (message?.type === 'error') {
+          setLoading(false);
+          setError(message.error || 'Streaming error');
         }
-      );
+      });
+
+      port.onDisconnect.addListener(() => {
+        streamPortRef.current = null;
+        setLoading(false);
+      });
+
+      port.postMessage({ action: 'queryAIStream', payload });
+      return;
     } catch (e) {
       console.error('[AI Search] Send failed:', e);
       setLoading(false);
@@ -182,6 +307,19 @@ const ContentApp: React.FC = () => {
       }
     }
   };
+
+  useEffect(() => {
+    if (!showPanel) {
+      disconnectStreamPort();
+      setLoading(false);
+    }
+  }, [showPanel]);
+
+  useEffect(() => {
+    return () => {
+      disconnectStreamPort();
+    };
+  }, []);
 
   // Styles
   const dotStyle: React.CSSProperties = {
@@ -205,11 +343,11 @@ const ContentApp: React.FC = () => {
 
   const panelStyle: React.CSSProperties = {
     position: 'fixed',
-    left: Math.min(Math.max(10, position.x - 20), window.innerWidth - 420) + dragOffset.x,
-    top: Math.min(position.y - window.scrollY + 5, window.innerHeight - 350) + dragOffset.y,
+    left: Math.min(Math.max(10, position.x - 20), window.innerWidth - panelSize.width - 20) + dragOffset.x,
+    top: Math.min(position.y - window.scrollY + 5, window.innerHeight - panelSize.height - 20) + dragOffset.y,
     zIndex: 2147483647,
-    width: 400,
-    maxWidth: 'calc(100vw - 20px)',
+    width: panelSize.width,
+    height: panelSize.height,
     backgroundColor: '#fff',
     borderRadius: 16,
     boxShadow: '0 10px 40px rgba(0,0,0,0.15)',
@@ -218,6 +356,8 @@ const ContentApp: React.FC = () => {
     color: '#1f2937',
     overflow: 'hidden',
     border: '1px solid #e5e7eb',
+    display: 'flex',
+    flexDirection: 'column',
   };
 
   const headerStyle: React.CSSProperties = {
@@ -255,13 +395,40 @@ const ContentApp: React.FC = () => {
 
   const contentStyle: React.CSSProperties = {
     padding: 16,
+    flex: 1,
+    overflow: 'hidden',
+    display: 'flex',
+    flexDirection: 'column',
   };
 
   const selectionTitleStyle: React.CSSProperties = {
-    fontSize: 18,
-    fontWeight: 700,
-    marginBottom: 12,
+    fontSize: 16,
+    fontWeight: 600,
+    marginBottom: 8,
     color: '#111827',
+    lineHeight: 1.5,
+  };
+
+  const selectionContainerStyle: React.CSSProperties = {
+    padding: 12,
+    marginBottom: 12,
+  };
+
+  const toggleButtonStyle: React.CSSProperties = {
+    background: 'none',
+    border: 'none',
+    cursor: 'pointer',
+    color: '#3b82f6',
+    fontSize: 12,
+    padding: '4px 0',
+    marginTop: 4,
+    textDecoration: 'underline',
+  };
+
+  const dividerStyle: React.CSSProperties = {
+    height: 1,
+    backgroundColor: '#e5e7eb',
+    marginBottom: 12,
   };
 
   const resultStyle: React.CSSProperties = {
@@ -316,6 +483,33 @@ const ContentApp: React.FC = () => {
     justifyContent: 'center',
   };
 
+  // Resize handle styles
+  const resizeHandleStyle: React.CSSProperties = {
+    position: 'absolute',
+    backgroundColor: 'transparent',
+    zIndex: 10,
+  };
+
+  const cornerSize = 12;
+  const edgeSize = 6;
+
+  // Parse XML response from AI and format for display
+  const parseXmlResponse = (text: string, uiLang: 'zh' | 'en'): string => {
+    const baseMatch = text.match(/<base>([\s\S]*?)<\/base>/);
+    const contextMatch = text.match(/<context>([\s\S]*?)<\/context>/);
+    
+    if (baseMatch || contextMatch) {
+      const baseLabel = uiLang === 'zh' ? '基础含义' : 'Base meaning';
+      const contextLabel = uiLang === 'zh' ? '上下文含义' : 'Contextual meaning';
+      
+      let formatted = '';
+      if (baseMatch) formatted += `**${baseLabel}:** ${baseMatch[1].trim()}\n\n`;
+      if (contextMatch) formatted += `**${contextLabel}:** ${contextMatch[1].trim()}`;
+      return formatted;
+    }
+    return text; // fallback to original if parsing fails
+  };
+
   // Strip markdown symbols for speech
   const stripMarkdown = (text: string): string => {
     return text
@@ -343,7 +537,8 @@ const ContentApp: React.FC = () => {
     // Cancel any ongoing speech
     synthesis.cancel();
 
-    const textToSpeak = stripMarkdown(result);
+    const parsedResult = parseXmlResponse(result, lang);
+    const textToSpeak = stripMarkdown(parsedResult);
     const utterance = new SpeechSynthesisUtterance(textToSpeak);
     utterance.lang = lang === 'zh' ? 'zh-CN' : 'en-US';
     synthesis.speak(utterance);
@@ -377,6 +572,42 @@ const ContentApp: React.FC = () => {
 
       {showPanel && (
         <div ref={panelRef} style={panelStyle}>
+          {/* Resize handles - corners */}
+          <div
+            style={{ ...resizeHandleStyle, top: 0, left: 0, width: cornerSize, height: cornerSize, cursor: 'nw-resize' }}
+            onMouseDown={(e) => handleResizeStart(e, 'nw')}
+          />
+          <div
+            style={{ ...resizeHandleStyle, top: 0, right: 0, width: cornerSize, height: cornerSize, cursor: 'ne-resize' }}
+            onMouseDown={(e) => handleResizeStart(e, 'ne')}
+          />
+          <div
+            style={{ ...resizeHandleStyle, bottom: 0, left: 0, width: cornerSize, height: cornerSize, cursor: 'sw-resize' }}
+            onMouseDown={(e) => handleResizeStart(e, 'sw')}
+          />
+          <div
+            style={{ ...resizeHandleStyle, bottom: 0, right: 0, width: cornerSize, height: cornerSize, cursor: 'se-resize' }}
+            onMouseDown={(e) => handleResizeStart(e, 'se')}
+          />
+          
+          {/* Resize handles - edges */}
+          <div
+            style={{ ...resizeHandleStyle, top: 0, left: cornerSize, right: cornerSize, height: edgeSize, cursor: 'n-resize' }}
+            onMouseDown={(e) => handleResizeStart(e, 'n')}
+          />
+          <div
+            style={{ ...resizeHandleStyle, bottom: 0, left: cornerSize, right: cornerSize, height: edgeSize, cursor: 's-resize' }}
+            onMouseDown={(e) => handleResizeStart(e, 's')}
+          />
+          <div
+            style={{ ...resizeHandleStyle, left: 0, top: cornerSize, bottom: cornerSize, width: edgeSize, cursor: 'w-resize' }}
+            onMouseDown={(e) => handleResizeStart(e, 'w')}
+          />
+          <div
+            style={{ ...resizeHandleStyle, right: 0, top: cornerSize, bottom: cornerSize, width: edgeSize, cursor: 'e-resize' }}
+            onMouseDown={(e) => handleResizeStart(e, 'e')}
+          />
+
           <div style={headerStyle} onMouseDown={handleDragStart}>
             <div style={{
               width: 28,
@@ -414,69 +645,92 @@ const ContentApp: React.FC = () => {
           </div>
 
           <div style={contentStyle}>
-            <div style={selectionTitleStyle}>{selection}</div>
+            <div style={selectionContainerStyle}>
+              <div style={selectionTitleStyle}>
+                {selection.length > 150 && !isTextExpanded
+                  ? selection.substring(0, 120) + '...'
+                  : selection}
+              </div>
+              {selection.length > 150 && (
+                <button
+                  style={toggleButtonStyle}
+                  onClick={() => setIsTextExpanded(!isTextExpanded)}
+                  onMouseOver={(e) => (e.currentTarget.style.opacity = '0.8')}
+                  onMouseOut={(e) => (e.currentTarget.style.opacity = '1')}
+                >
+                  {isTextExpanded ? (lang === 'zh' ? '收起' : 'Collapse') : (lang === 'zh' ? '展开全文' : 'Expand')}
+                </button>
+              )}
+            </div>
 
-            <div style={{ maxHeight: 280, overflowY: 'auto' }}>
-              {loading ? (
-                <div style={loadingStyle}>
-                  <div style={spinnerStyle} />
-                  <span>{t.loading[lang]}</span>
-                </div>
-              ) : error ? (
+            <div style={dividerStyle} />
+
+            <div style={{ flex: 1, overflowY: 'auto', minHeight: 0 }}>
+              {error ? (
                 <div style={errorStyle}>
                   <strong>{t.errorTitle[lang]}</strong> {error}
                 </div>
               ) : (
-                <div style={resultStyle}>
-                  <ReactMarkdown
-                    components={{
-                      p: ({ children }) => <p style={{ margin: '0 0 6px 0', lineHeight: 1.6 }}>{children}</p>,
-                      strong: ({ children }) => <strong style={{ fontWeight: 600, color: '#111827' }}>{children}</strong>,
-                      em: ({ children }) => <em style={{ fontStyle: 'italic' }}>{children}</em>,
-                      ul: ({ children }) => <ul style={{ margin: '4px 0', paddingLeft: 18 }}>{children}</ul>,
-                      ol: ({ children }) => <ol style={{ margin: '4px 0', paddingLeft: 18 }}>{children}</ol>,
-                      li: ({ children }) => <li style={{ marginBottom: 2 }}>{children}</li>,
-                      code: ({ children }) => (
-                        <code style={{
-                          backgroundColor: '#f3f4f6',
-                          padding: '1px 5px',
-                          borderRadius: 3,
-                          fontSize: 13,
-                          fontFamily: 'Monaco, Consolas, monospace'
-                        }}>{children}</code>
-                      ),
-                      pre: ({ children }) => (
-                        <pre style={{
-                          backgroundColor: '#f3f4f6',
-                          padding: 10,
-                          borderRadius: 6,
-                          overflow: 'auto',
-                          fontSize: 13,
-                          margin: '6px 0',
-                          fontFamily: 'Monaco, Consolas, monospace'
-                        }}>{children}</pre>
-                      ),
-                      h1: ({ children }) => <h1 style={{ fontSize: 16, fontWeight: 700, margin: '8px 0 4px' }}>{children}</h1>,
-                      h2: ({ children }) => <h2 style={{ fontSize: 15, fontWeight: 600, margin: '6px 0 3px' }}>{children}</h2>,
-                      h3: ({ children }) => <h3 style={{ fontSize: 14, fontWeight: 600, margin: '4px 0 2px' }}>{children}</h3>,
-                      a: ({ href, children }) => (
-                        <a href={href} target="_blank" rel="noopener noreferrer"
-                           style={{ color: '#3b82f6', textDecoration: 'underline' }}>{children}</a>
-                      ),
-                      blockquote: ({ children }) => (
-                        <blockquote style={{
-                          borderLeft: '3px solid #e5e7eb',
-                          paddingLeft: 10,
-                          margin: '4px 0',
-                          color: '#6b7280'
-                        }}>{children}</blockquote>
-                      ),
-                      br: () => <br style={{ lineHeight: 0.5 }} />,
-                    }}
-                  >
-                    {result}
-                  </ReactMarkdown>
-                </div>
+                <>
+                  {loading && !result && (
+                    <div style={loadingStyle}>
+                      <div style={spinnerStyle} />
+                      <span>{t.loading[lang]}</span>
+                    </div>
+                  )}
+                  {(!loading || result) && (
+                    <div style={resultStyle}>
+                      <ReactMarkdown
+                        components={{
+                          p: ({ children }) => <p style={{ margin: '0 0 6px 0', lineHeight: 1.6 }}>{children}</p>,
+                          strong: ({ children }) => <strong style={{ fontWeight: 600, color: '#111827' }}>{children}</strong>,
+                          em: ({ children }) => <em style={{ fontStyle: 'italic' }}>{children}</em>,
+                          ul: ({ children }) => <ul style={{ margin: '4px 0', paddingLeft: 18 }}>{children}</ul>,
+                          ol: ({ children }) => <ol style={{ margin: '4px 0', paddingLeft: 18 }}>{children}</ol>,
+                          li: ({ children }) => <li style={{ marginBottom: 2 }}>{children}</li>,
+                          code: ({ children }) => (
+                            <code style={{
+                              backgroundColor: '#f3f4f6',
+                              padding: '1px 5px',
+                              borderRadius: 3,
+                              fontSize: 13,
+                              fontFamily: 'Monaco, Consolas, monospace'
+                            }}>{children}</code>
+                          ),
+                          pre: ({ children }) => (
+                            <pre style={{
+                              backgroundColor: '#f3f4f6',
+                              padding: 10,
+                              borderRadius: 6,
+                              overflow: 'auto',
+                              fontSize: 13,
+                              margin: '6px 0',
+                              fontFamily: 'Monaco, Consolas, monospace'
+                            }}>{children}</pre>
+                          ),
+                          h1: ({ children }) => <h1 style={{ fontSize: 16, fontWeight: 700, margin: '8px 0 4px' }}>{children}</h1>,
+                          h2: ({ children }) => <h2 style={{ fontSize: 15, fontWeight: 600, margin: '6px 0 3px' }}>{children}</h2>,
+                          h3: ({ children }) => <h3 style={{ fontSize: 14, fontWeight: 600, margin: '4px 0 2px' }}>{children}</h3>,
+                          a: ({ href, children }) => (
+                            <a href={href} target="_blank" rel="noopener noreferrer"
+                               style={{ color: '#3b82f6', textDecoration: 'underline' }}>{children}</a>
+                          ),
+                          blockquote: ({ children }) => (
+                            <blockquote style={{
+                              borderLeft: '3px solid #e5e7eb',
+                              paddingLeft: 10,
+                              margin: '4px 0',
+                              color: '#6b7280'
+                            }}>{children}</blockquote>
+                          ),
+                          br: () => <br style={{ lineHeight: 0.5 }} />,
+                        }}
+                      >
+                        {parseXmlResponse(result, lang)}
+                      </ReactMarkdown>
+                    </div>
+                  )}
+                </>
               )}
             </div>
 
@@ -484,7 +738,7 @@ const ContentApp: React.FC = () => {
               <div style={footerStyle}>
                 <button
                   style={actionButtonStyle}
-                  onClick={() => navigator.clipboard.writeText(result)}
+                  onClick={() => navigator.clipboard.writeText(parseXmlResponse(result, lang))}
                   title={t.copyTitle[lang]}
                 >
                   📋
