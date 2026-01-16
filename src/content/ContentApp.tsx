@@ -213,6 +213,7 @@ const ContentApp: React.FC = () => {
 
   useEffect(() => {
     const handleMouseUp = (e: MouseEvent) => {
+      if (isResizing || isDragging) return;
       // Ignore if clicking on our own elements
       if (dotRef.current?.contains(e.target as Node) || panelRef.current?.contains(e.target as Node)) {
         return;
@@ -244,7 +245,7 @@ const ContentApp: React.FC = () => {
 
     document.addEventListener('mouseup', handleMouseUp);
     return () => document.removeEventListener('mouseup', handleMouseUp);
-  }, [loading]);
+  }, [loading, isResizing, isDragging]);
 
   const handleTriggerQuery = () => {
     setShowDot(false);

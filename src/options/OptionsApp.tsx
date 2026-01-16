@@ -1,4 +1,4 @@
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, useRef } from 'react';
 import { getUILanguage, isBrowserChinese } from '../utils/language';
 import { translations } from '../utils/i18n';
 
@@ -22,7 +22,7 @@ const PROVIDER_CONFIGS: Record<Provider, ProviderConfig> = {
   anthropic: {
     name: { zh: 'Anthropic', en: 'Anthropic' },
     defaultBaseUrl: 'https://api.anthropic.com/v1/messages',
-    defaultModel: 'claude-sonnet-4-20250514',
+    defaultModel: 'claude-sonnet-4-5',
     storageKey: 'anthropic',
   },
   minimax: {
@@ -46,11 +46,26 @@ const PROVIDER_CONFIGS: Record<Provider, ProviderConfig> = {
 };
 
 const PROVIDER_MODEL_OPTIONS: Record<Provider, string[]> = {
-  minimax: [],
-  deepseek: [],
-  glm: [],
-  openai: [],
-  anthropic: [],
+  openai: [
+    'gpt-4o',
+    'gpt-4-turbo',
+    'gpt-4',
+  ],
+  anthropic: [
+    'claude-sonnet-4-5',
+    'claude-haiku-4-5',
+    'claude-opus-4-5',
+  ],
+  deepseek: [
+    'deepseek-chat',
+    'deepseek-reasoner',
+  ],
+  minimax: [
+    'MiniMax-M2.1',
+  ],
+  glm: [
+    'glm-4.7',
+  ],
 };
 
 // Get default output language from browser locale
@@ -68,6 +83,8 @@ const OptionsApp: React.FC = () => {
   const [lang, setLang] = useState<'zh' | 'en'>('zh');
   const [showApiKey, setShowApiKey] = useState(false);
   const [isLoading, setIsLoading] = useState(true);
+  const [showModelOptions, setShowModelOptions] = useState(false);
+  const modelBlurTimeoutRef = useRef<number | null>(null);
 
   // Initialize: load language and selected provider
   useEffect(() => {
@@ -216,6 +233,31 @@ const OptionsApp: React.FC = () => {
     backgroundPosition: 'right 12px center',
     backgroundSize: 20,
     paddingRight: 44,
+  };
+
+  const modelInputWrapperStyle: React.CSSProperties = {
+    position: 'relative',
+  };
+
+  const modelOptionsStyle: React.CSSProperties = {
+    position: 'absolute',
+    top: '100%',
+    left: 0,
+    right: 0,
+    marginTop: 8,
+    backgroundColor: '#fff',
+    border: '1px solid #e5e7eb',
+    borderRadius: 12,
+    boxShadow: '0 12px 24px rgba(0,0,0,0.12)',
+    maxHeight: 220,
+    overflowY: 'auto',
+    zIndex: 20,
+  };
+
+  const modelOptionItemStyle: React.CSSProperties = {
+    padding: '10px 14px',
+    fontSize: 14,
+    cursor: 'pointer',
   };
 
   const hintStyle: React.CSSProperties = {
@@ -463,28 +505,55 @@ const OptionsApp: React.FC = () => {
             <div style={rowStyle}>
               <div>
                 <label style={labelStyle}>{t.modelLabel[lang]}</label>
-                <input
-                  type="text"
-                  value={model}
-                  onChange={(e) => setModel(e.target.value)}
-                  list={modelOptions.length ? 'model-options' : undefined}
-                  style={inputStyle}
-                  onFocus={(e) => {
-                    e.target.style.borderColor = '#3b82f6';
-                    e.target.style.boxShadow = '0 0 0 3px rgba(59,130,246,0.1)';
-                  }}
-                  onBlur={(e) => {
-                    e.target.style.borderColor = '#e5e7eb';
-                    e.target.style.boxShadow = 'none';
-                  }}
-                />
-                {modelOptions.length > 0 && (
-                  <datalist id="model-options">
-                    {modelOptions.map((modelOption) => (
-                      <option key={modelOption} value={modelOption} />
-                    ))}
-                  </datalist>
-                )}
+                <div style={modelInputWrapperStyle}>
+                  <input
+                    type="text"
+                    value={model}
+                    onChange={(e) => setModel(e.target.value)}
+                    style={inputStyle}
+                    onFocus={(e) => {
+                      if (modelBlurTimeoutRef.current) {
+                        window.clearTimeout(modelBlurTimeoutRef.current);
+                        modelBlurTimeoutRef.current = null;
+                      }
+                      setShowModelOptions(true);
+                      e.target.style.borderColor = '#3b82f6';
+                      e.target.style.boxShadow = '0 0 0 3px rgba(59,130,246,0.1)';
+                    }}
+                    onBlur={(e) => {
+                      e.target.style.borderColor = '#e5e7eb';
+                      e.target.style.boxShadow = 'none';
+                      modelBlurTimeoutRef.current = window.setTimeout(() => {
+                        setShowModelOptions(false);
+                      }, 120);
+                    }}
+                  />
+                  {showModelOptions && modelOptions.length > 0 && (
+                    <div style={modelOptionsStyle}>
+                      {modelOptions.map((modelOption) => (
+                        <div
+                          key={modelOption}
+                          role="option"
+                          aria-selected={modelOption === model}
+                          style={modelOptionItemStyle}
+                          onMouseDown={(e) => {
+                            e.preventDefault();
+                            setModel(modelOption);
+                            setShowModelOptions(false);
+                          }}
+                          onMouseEnter={(e) => {
+                            e.currentTarget.style.backgroundColor = '#f3f4f6';
+                          }}
+                          onMouseLeave={(e) => {
+                            e.currentTarget.style.backgroundColor = '#fff';
+                          }}
+                        >
+                          {modelOption}
+                        </div>
+                      ))}
+                    </div>
+                  )}
+                </div>
                 <p style={hintStyle}>{t.modelCustomHint[lang]}</p>
               </div>
 

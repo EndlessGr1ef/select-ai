@@ -22,6 +22,7 @@
 |---------|-------------|----------|
 | 🎯 **Smart Selection** | Floating button appears on text selection, click to query | Get instant explanations |
 | 🧠 **Context Awareness** | Auto-extract 500-3000 characters context for accurate AI understanding | Technical terms, complex sentences |
+| 🚀 **Streaming Output** | Stream responses in real time as they are generated | Get answers faster |
 | 🌐 **Multi-language** | Supports Chinese, English, Japanese, Korean output | Foreign language reading & learning |
 | 🔌 **Multi-API Support** | MiniMax / OpenAI / Anthropic / DeepSeek / Zhipu AI / Custom API | Flexible deployment, self-hosted services |
 | 💬 **Markdown Rendering** | AI responses displayed in beautiful Markdown format | Clear, readable output |
