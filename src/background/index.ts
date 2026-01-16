@@ -160,7 +160,8 @@ async function buildRequestConfig(payload: QueryPayload): Promise<RequestConfig>
    基础含义:xxx
    上下文中的含义:xxx
 4. 请以陈述句回答, 回答内容限制在1000tokens以内;
-5. 用中文回答,按markdown格式美化输出`
+5. 用中文回答,按markdown格式美化输出;
+6. 禁止使用代码块、内联代码或HTML标签(例如: \`\`\`、\`code\`、<tag>)`
     : `You are a concise explanation assistant. The user has selected text while browsing a webpage. Based on the page information and context provided, give a precise and concise explanation or translation of the selected text.
 
 【Must follow rules】
@@ -170,7 +171,8 @@ async function buildRequestConfig(payload: QueryPayload): Promise<RequestConfig>
    Base meaning: xxx;
    Contextual meaning: xxx;
 4. Answer in a declarative sentence, the response content should be less than 1000 tokens;
-5. Respond in ${targetLang}, beautify the output in markdown format`;
+5. Respond in ${targetLang}, beautify the output in markdown format;
+6. Do not use code blocks, inline code, or HTML tags (e.g., \`\`\` or \`code\` or <tag>)`;
 
   const userPrompt = `<page>
 <url>${payload.pageUrl || 'unknown'}</url>
