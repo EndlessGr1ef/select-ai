@@ -45,7 +45,7 @@ const PROVIDER_CONFIGS: Record<Provider, ProviderConfig> = {
   },
 };
 
-// 根据浏览器语言获取默认输出语言
+// Get default output language from browser locale
 function getDefaultTargetLanguage(): string {
   return isBrowserChinese() ? '中文' : 'English';
 }

@@ -1,7 +1,7 @@
 import React, { useState, useEffect, useRef } from 'react';
 import ReactMarkdown from 'react-markdown';
 import { ContextExtractor } from '../utils/ContextExtractor';
-import { getUILanguage } from '../utils/language';
+import { getUILanguage, isBrowserChinese } from '../utils/language';
 import { translations } from '../utils/i18n';
 
 const ContentApp: React.FC = () => {
@@ -12,8 +12,10 @@ const ContentApp: React.FC = () => {
   const [result, setResult] = useState<string>('');
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
+  const defaultTargetLang = isBrowserChinese() ? '中文' : 'English';
   const [modelName, setModelName] = useState('MiniMax-M2.1');
   const [lang, setLang] = useState<'zh' | 'en'>('zh');
+  const [targetLang, setTargetLang] = useState(defaultTargetLang);
   const [isTextExpanded, setIsTextExpanded] = useState(false);
 
   // Resize state for panel
@@ -36,16 +38,26 @@ const ContentApp: React.FC = () => {
     setLang(getUILanguage());
   }, []);
 
-  // 获取当前 provider 和模型名称
+  // Load provider, model name, and output language
   useEffect(() => {
     const getProviderConfig = async () => {
-      const result = await chrome.storage.local.get(['selectedProvider']);
+      const result = await chrome.storage.local.get(['selectedProvider', 'targetLanguage']);
       const provider = (result.selectedProvider as string) || 'minimax';
       const modelKey = `${provider}Model`;
       const modelResult = await chrome.storage.local.get([modelKey]);
       setModelName((modelResult[modelKey] as string) || 'MiniMax-M2.1');
+      setTargetLang((result.targetLanguage as string) || defaultTargetLang);
     };
     getProviderConfig();
+
+    const handleStorageChange = (changes: { [key: string]: chrome.storage.StorageChange }) => {
+      if (changes.targetLanguage) {
+        setTargetLang((changes.targetLanguage.newValue as string) || defaultTargetLang);
+      }
+    };
+
+    chrome.storage.onChanged.addListener(handleStorageChange);
+    return () => chrome.storage.onChanged.removeListener(handleStorageChange);
   }, []);
 
   // Drag handlers for panel repositioning
@@ -225,7 +237,7 @@ const ContentApp: React.FC = () => {
 
     try {
       chrome.runtime.sendMessage(
-        { action: 'queryAI', payload: { selection, context, pageUrl, pageTitle, targetLang: lang } },
+        { action: 'queryAI', payload: { selection, context, pageUrl, pageTitle, targetLang, uiLang: lang } },
         (response) => {
           setLoading(false);
 
@@ -439,6 +451,23 @@ const ContentApp: React.FC = () => {
   const cornerSize = 12;
   const edgeSize = 6;
 
+  // Parse XML response from AI and format for display
+  const parseXmlResponse = (text: string, uiLang: 'zh' | 'en'): string => {
+    const baseMatch = text.match(/<base>([\s\S]*?)<\/base>/);
+    const contextMatch = text.match(/<context>([\s\S]*?)<\/context>/);
+    
+    if (baseMatch || contextMatch) {
+      const baseLabel = uiLang === 'zh' ? '基础含义' : 'Base meaning';
+      const contextLabel = uiLang === 'zh' ? '上下文含义' : 'Contextual meaning';
+      
+      let formatted = '';
+      if (baseMatch) formatted += `**${baseLabel}:** ${baseMatch[1].trim()}\n\n`;
+      if (contextMatch) formatted += `**${contextLabel}:** ${contextMatch[1].trim()}`;
+      return formatted;
+    }
+    return text; // fallback to original if parsing fails
+  };
+
   // Strip markdown symbols for speech
   const stripMarkdown = (text: string): string => {
     return text
@@ -466,7 +495,8 @@ const ContentApp: React.FC = () => {
     // Cancel any ongoing speech
     synthesis.cancel();
 
-    const textToSpeak = stripMarkdown(result);
+    const parsedResult = parseXmlResponse(result, lang);
+    const textToSpeak = stripMarkdown(parsedResult);
     const utterance = new SpeechSynthesisUtterance(textToSpeak);
     utterance.lang = lang === 'zh' ? 'zh-CN' : 'en-US';
     synthesis.speak(utterance);
@@ -651,7 +681,7 @@ const ContentApp: React.FC = () => {
                       br: () => <br style={{ lineHeight: 0.5 }} />,
                     }}
                   >
-                    {result}
+                    {parseXmlResponse(result, lang)}
                   </ReactMarkdown>
                 </div>
               )}
@@ -661,7 +691,7 @@ const ContentApp: React.FC = () => {
               <div style={footerStyle}>
                 <button
                   style={actionButtonStyle}
-                  onClick={() => navigator.clipboard.writeText(result)}
+                  onClick={() => navigator.clipboard.writeText(parseXmlResponse(result, lang))}
                   title={t.copyTitle[lang]}
                 >
                   📋

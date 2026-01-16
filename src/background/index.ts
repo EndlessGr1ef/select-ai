@@ -105,12 +105,15 @@ chrome.runtime.onMessage.addListener((request, _sender, sendResponse) => {
 // Maximum context length sent to API (in characters)
 const MAX_CONTEXT_FOR_API = 2000;
 
+import { isBrowserChinese } from '../utils/language';
+
 async function handleAIQuery(payload: {
   selection: string;
   context: string;
   pageUrl?: string;
   pageTitle?: string;
-  targetLang?: 'zh' | 'en';
+  targetLang?: string;
+  uiLang?: 'zh' | 'en';
 }): Promise<string> {
   const settings = await chrome.storage.local.get(['selectedProvider']);
 
@@ -130,10 +133,14 @@ async function handleAIQuery(payload: {
   const apiKey = providerSettings[`${storageKey}ApiKey`] as string | undefined;
   const baseUrl = (providerSettings[`${storageKey}BaseUrl`] as string) || config.defaultBaseUrl;
   const model = (providerSettings[`${storageKey}Model`] as string) || config.defaultModel;
-  const targetLang = (providerSettings.targetLanguage as string) || '中文';
+  const targetLang = (providerSettings.targetLanguage as string)
+    || payload.targetLang
+    || (isBrowserChinese() ? '中文' : 'English');
+
+  const isChineseUI = payload.uiLang ? payload.uiLang === 'zh' : payload.targetLang !== 'en';
 
   if (!apiKey) {
-    throw new Error(payload.targetLang === 'en' ? 'Please configure API Key in settings' : '请先在设置页面配置 API Key');
+    throw new Error(isChineseUI ? '请先在设置页面配置 API Key' : 'Please configure API Key in settings');
   }
 
   // Prepare context (truncate if needed)
@@ -141,35 +148,38 @@ async function handleAIQuery(payload: {
     ? payload.context.substring(0, MAX_CONTEXT_FOR_API) + '...'
     : payload.context;
 
-  // Use UI language to determine system prompt language
-  const isChineseUI = payload.targetLang !== 'en';
+  const isChineseTarget = targetLang.startsWith('中文') || targetLang.toLowerCase().startsWith('zh');
 
-  const systemPrompt = isChineseUI
-    ? `你是一个极简解释助手。用户在浏览网页时选中了一段文字进行查询。
-请结合提供的页面信息和上下文内容，对选中的文字进行精准、简练的解释和翻译。
-目标语言: ${targetLang}
+  const systemPrompt = isChineseTarget
+    ? `你是一个极简解释助手。用户在浏览网页时选中了一段文字进行查询。请结合提供的页面信息和上下文内容，对选中的文字进行精准、简练的解释和翻译。
 
-【重要规则】
-1. 直接给出解释内容，不要在回复中重复或引用原文（如"原文："、"选中内容："等）
-2. 先解释其本身的意思，再解释在上下文中的含义
-3. 保持回答简洁明了`
-    : `You are a concise explanation assistant. The user has selected text while browsing a webpage.
-Based on the page information and context provided, give a precise and concise explanation or translation of the selected text.
-Target language: ${targetLang}
+【必须遵守的规则】
+1. 直接给出解释内容，不要重复或引用原文;
+2. 保持回答简洁，不要冗长;
+3. 必须严格按以下格式输出回复;
+   基础含义:xxx
+   上下文中的含义:xxx
+4. 请以陈述句回答, 回答内容限制在1000tokens以内;
+5. 用中文回答`
+    : `You are a concise explanation assistant. The user has selected text while browsing a webpage. Based on the page information and context provided, give a precise and concise explanation or translation of the selected text.
 
-【Important Rules】
-1. Provide the explanation directly without repeating or quoting the original text (no "Original:", "Selected text:", etc.)
-2. First explain its base meaning, then explain its meaning in the context
-3. Keep your response concise and clear`;
+【Must follow rules】
+1. Provide the explanation directly without repeating or quoting the original text;
+2. Keep your response concise, avoid verbosity;
+3. You MUST output in the following format only, nothing else:
+   Base meaning: xxx;
+   Contextual meaning: xxx;
+4. Answer in a declarative sentence, the response content should be less than 1000 tokens;
+5. Respond in ${targetLang}`;
 
   const userPrompt = `<page>
-  <url>${payload.pageUrl || 'unknown'}</url>
-  <title>${payload.pageTitle || 'unknown'}</title>
+<url>${payload.pageUrl || 'unknown'}</url>
+<title>${payload.pageTitle || 'unknown'}</title>
 </page>
 <context>${contextForApi}</context>
 <selection>${payload.selection}</selection>
 
-请解释上述选中内容。`;
+${isChineseTarget ? '请解释上面选中的内容。' : 'Please explain the selected text above.'}`;
 
   const apiConfig = API_CONFIGS[provider];
   const endpoint = provider === 'openai'
@@ -179,7 +189,7 @@ Target language: ${targetLang}
     ? `Bearer ${apiKey}`
     : apiKey;
 
-  // OpenAI 需要将 system 放在 messages 数组中
+  // OpenAI requires system inside messages
   const isOpenAI = provider === 'openai';
   const requestBody = isOpenAI
     ? {
@@ -202,6 +212,8 @@ Target language: ${targetLang}
         ],
         stream: false
       };
+
+  console.log('[AI Search] requestBody:', JSON.stringify(requestBody, null, 2));
 
   const response = await fetch(endpoint, {
     method: 'POST',
@@ -276,7 +288,7 @@ Target language: ${targetLang}
   }
 
   // Log and throw with actual response for debugging
-  const isChineseError = payload.targetLang !== 'en';
+  const isChineseError = payload.uiLang ? payload.uiLang === 'zh' : payload.targetLang !== 'en';
   throw new Error(
     (isChineseError ? 'API 返回格式异常: ' : 'API response format error: ') +
     JSON.stringify(data).substring(0, 300)
