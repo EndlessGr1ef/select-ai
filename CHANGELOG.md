@@ -2,6 +2,15 @@
 
 ## [0.3.0] - 2026-01-17
 
+### Added / 新增
+- Global translation feature with floating button / 全局翻译功能，带悬浮按钮
+- Full-page or selected text translation / 支持全页或选中文本翻译
+- Bilingual translation display (original + translation) / 双语翻译显示（原文+译文）
+- Streaming AI response output / 流式 AI 响应输出
+- Support for OpenAI and Anthropic stream formats / 支持 OpenAI 和 Anthropic 流式格式
+- Content priority-based translation / 基于内容优先级的翻译
+- Blacklist for excluding certain elements / 黑名单功能排除特定元素
+
 ### Changed / 改进
 - Internationalized all code comments to English / 将所有代码注释国际化为英文
 - Updated 7 files with 100+ comment translations / 更新了 7 个文件中的 100+ 条注释翻译
