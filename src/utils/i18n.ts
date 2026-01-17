@@ -42,6 +42,30 @@ export const translations = {
       zh: ['在网页上划选任意文字', '点击出现的粉紫色小圆点', 'AI 将自动分析上下文并给出解释或翻译'],
       en: ['Select any text on the webpage', 'Click the pink-purple dot', 'AI will analyze and provide explanation or translation'],
     },
+    // Blacklist section
+    blacklistSection: { zh: '🚫 页面黑名单', en: '🚫 Page Blacklist' },
+    blacklistEnabled: { zh: '启用黑名单', en: 'Enable Blacklist' },
+    blacklistAddRule: { zh: '添加规则', en: 'Add Rule' },
+    blacklistSelectorLabel: { zh: 'CSS 选择器', en: 'CSS Selector' },
+    blacklistSelectorHint: { zh: '多个选择器用逗号分隔，如: .ads, .sidebar, header, footer', en: 'Multiple selectors separated by commas, e.g.: .ads, .sidebar, header, footer' },
+    blacklistDelete: { zh: '删除', en: 'Delete' },
+    blacklistEnabledLabel: { zh: '启用', en: 'Enabled' },
+    blacklistEmpty: { zh: '暂无黑名单规则', en: 'No blacklist rules' },
+    blacklistCancel: { zh: '取消', en: 'Cancel' },
+    // Tab headers
+    tabApiConfig: { zh: 'API 配置', en: 'API Config' },
+    tabTranslationSettings: { zh: '全局翻译', en: 'Global Translation' },
+    // Translation settings section
+    translationSettingsTitle: { zh: '翻译设置', en: 'Translation Settings' },
+    // Guide steps for translation tab
+    translationGuideSteps: {
+      zh: ['打开任意网页', '点击翻译按钮查看选中部分或全页面翻译'],
+      en: ['Open any webpage', 'Select any text', 'Click the floating button to see AI translation'],
+    },
+    concurrencyLabel: { zh: 'API 并发数量', en: 'API Concurrency' },
+    concurrencyHint: { zh: '同时发送翻译请求的最大标签页数量 (1-20)', en: 'Max concurrent translation requests across tabs (1-20)' },
+    blacklistToggleLabel: { zh: '启用 CSS 黑名单', en: 'Enable CSS Blacklist' },
+    blacklistToggleHint: { zh: '排除页面广告、导航栏等非主要内容区域', en: 'Exclude ads, nav bars and other non-main content areas' },
   },
   content: {
     loading: { zh: '正在分析上下文...', en: 'Analyzing context...' },
@@ -50,5 +74,12 @@ export const translations = {
     noResponse: { zh: '服务未响应，请刷新页面重试', en: 'Service not responding, please retry' },
     copyTitle: { zh: '复制', en: 'Copy' },
     speakTitle: { zh: '朗读', en: 'Read aloud' },
+    // Bilingual translation related
+    translateBtn: { zh: '翻译', en: 'Translate' },
+    bilingualTitle: { zh: '🔤 双语翻译', en: '🔤 Bilingual' },
+    originalLabel: { zh: '📄 原文:', en: '📄 Original:' },
+    translationLabel: { zh: '🌐 译文:', en: '🌐 Translation:' },
+    translateLoading: { zh: '正在翻译...', en: 'Translating...' },
+    noSelection: { zh: '请先选择要翻译的文本', en: 'Please select text to translate' },
   },
 };

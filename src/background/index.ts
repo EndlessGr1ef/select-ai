@@ -25,7 +25,7 @@ const PROVIDER_CONFIGS: Record<Provider, ProviderConfig> = {
   },
   anthropic: {
     defaultBaseUrl: 'https://api.anthropic.com/v1/messages',
-    defaultModel: 'claude-sonnet-4-20250514',
+    defaultModel: 'claude-sonnet-4-5',
     storageKey: 'anthropic',
   },
   minimax: {
@@ -59,7 +59,7 @@ const API_CONFIGS: Record<Provider, ProviderApiConfig> = {
   },
   minimax: {
     endpointPath: '/v1/messages',
-    authHeader: 'x-api-key',
+    authHeader: 'Bearer',
     extraHeaders: { 'anthropic-version': '2023-06-01' },
   },
   deepseek: {
@@ -88,6 +88,59 @@ function normalizeOpenAIEndpoint(baseUrl: string): string {
 // Maximum context length sent to API (in characters)
 const MAX_CONTEXT_FOR_API = 2000;
 
+// Optimization 1: Config cache - avoid reading storage on every request
+let cachedProviderConfig: {
+  provider: Provider;
+  apiKey: string;
+  baseUrl: string;
+  model: string;
+  targetLang: string;
+} | null = null;
+
+async function getCachedProviderConfig() {
+  if (cachedProviderConfig) return cachedProviderConfig;
+
+  const settings = await chrome.storage.local.get(['selectedProvider']);
+
+  const provider = (settings.selectedProvider as Provider) || 'openai';
+  const config = PROVIDER_CONFIGS[provider];
+  const storageKey = config.storageKey;
+
+  const allKeys = [
+    `${storageKey}ApiKey`,
+    `${storageKey}BaseUrl`,
+    `${storageKey}Model`,
+    'targetLanguage'
+  ];
+  const providerSettings = await chrome.storage.local.get(allKeys);
+
+  cachedProviderConfig = {
+    provider,
+    apiKey: providerSettings[`${storageKey}ApiKey`] as string,
+    baseUrl: (providerSettings[`${storageKey}BaseUrl`] as string) || config.defaultBaseUrl,
+    model: (providerSettings[`${storageKey}Model`] as string) || config.defaultModel,
+    targetLang: (providerSettings.targetLanguage as string) || (isBrowserChinese() ? '中文' : 'English')
+  };
+
+  return cachedProviderConfig;
+}
+
+// Listen for config changes, update cache
+chrome.storage.onChanged.addListener((changes) => {
+  const relevantKeys = ['selectedProvider', 'openaiApiKey', 'openaiBaseUrl', 'openaiModel',
+    'anthropicApiKey', 'anthropicBaseUrl', 'anthropicModel',
+    'minimaxApiKey', 'minimaxBaseUrl', 'minimaxModel',
+    'deepseekApiKey', 'deepseekBaseUrl', 'deepseekModel',
+    'glmApiKey', 'glmBaseUrl', 'glmModel', 'targetLanguage'];
+
+  for (const key of relevantKeys) {
+    if (changes[key]) {
+      cachedProviderConfig = null;
+      break;
+    }
+  }
+});
+
 import { isBrowserChinese } from '../utils/language';
 
 type QueryPayload = {
@@ -115,27 +168,15 @@ function getStreamFormat(provider: Provider): StreamFormat {
 }
 
 async function buildRequestConfig(payload: QueryPayload): Promise<RequestConfig> {
-  const settings = await chrome.storage.local.get(['selectedProvider']);
+  // Optimization 1: Use cached config
+  const cachedConfig = await getCachedProviderConfig();
 
-  const provider = (settings.selectedProvider as Provider) || 'openai';
-  const config = PROVIDER_CONFIGS[provider];
-  const storageKey = config.storageKey;
+  const provider = cachedConfig.provider;
 
-  // Get provider-specific settings
-  const allKeys = [
-    `${storageKey}ApiKey`,
-    `${storageKey}BaseUrl`,
-    `${storageKey}Model`,
-    'targetLanguage'
-  ];
-  const providerSettings = await chrome.storage.local.get(allKeys);
-
-  const apiKey = providerSettings[`${storageKey}ApiKey`] as string | undefined;
-  const baseUrl = (providerSettings[`${storageKey}BaseUrl`] as string) || config.defaultBaseUrl;
-  const model = (providerSettings[`${storageKey}Model`] as string) || config.defaultModel;
-  const targetLang = (providerSettings.targetLanguage as string)
-    || payload.targetLang
-    || (isBrowserChinese() ? '中文' : 'English');
+  const apiKey = cachedConfig.apiKey;
+  const baseUrl = cachedConfig.baseUrl;
+  const model = cachedConfig.model;
+  const targetLang = cachedConfig.targetLang || payload.targetLang || '中文';
 
   const isChineseUI = payload.uiLang ? payload.uiLang === 'zh' : payload.targetLang !== 'en';
 
@@ -288,11 +329,25 @@ function parseAnthropicStreamPayload(data: unknown): StreamParseResult {
   return {};
 }
 
+// Optimization 2: API timeout control
+const REQUEST_TIMEOUT = 30000; // 30 seconds
+
 async function handleAIStream(payload: QueryPayload, port: chrome.runtime.Port): Promise<void> {
   const { streamFormat, endpoint, headers, requestBody, isChineseUI } = await buildRequestConfig(payload);
 
   const controller = new AbortController();
-  const onDisconnect = () => controller.abort();
+
+  // Timeout control
+  const timeoutId = setTimeout(() => {
+    controller.abort();
+    port.postMessage({ type: 'error', error: isChineseUI ? '请求超时（30秒）' : 'Request timeout (30s)' });
+  }, REQUEST_TIMEOUT);
+
+  // Cleanup when port disconnects
+  const onDisconnect = () => {
+    clearTimeout(timeoutId);
+    controller.abort();
+  };
   port.onDisconnect.addListener(onDisconnect);
 
   let doneSent = false;
@@ -387,6 +442,7 @@ async function handleAIStream(payload: QueryPayload, port: chrome.runtime.Port):
       port.postMessage({ type: 'error', error: (error as Error).message || String(error) });
     }
   } finally {
+    clearTimeout(timeoutId);
     port.onDisconnect.removeListener(onDisconnect);
     if (!doneSent) {
       port.postMessage({ type: 'done' });
@@ -395,13 +451,224 @@ async function handleAIStream(payload: QueryPayload, port: chrome.runtime.Port):
 }
 
 chrome.runtime.onConnect.addListener((port) => {
-  if (port.name !== 'ai-stream') return;
+  if (port.name !== 'ai-stream' && port.name !== 'ai-translate-stream') return;
 
   port.onMessage.addListener((message) => {
     if (message?.action === 'queryAIStream') {
       handleAIStream(message.payload as QueryPayload, port).catch((error) => {
         port.postMessage({ type: 'error', error: error.message || String(error) });
       });
+    } else if (message?.action === 'inlineTranslate') {
+      handleInlineTranslate(message.payload as InlineTranslatePayload, port).catch((error) => {
+        port.postMessage({ type: 'error', error: error.message || String(error) });
+      });
     }
   });
 });
+
+type InlineTranslatePayload = {
+  selection: string;
+  targetLang?: string;
+  uiLang?: 'zh' | 'en';
+};
+
+type InlineTranslateRequestConfig = {
+  provider: Provider;
+  streamFormat: StreamFormat;
+  endpoint: string;
+  headers: Record<string, string>;
+  requestBody: Record<string, unknown>;
+};
+
+async function buildInlineTranslateRequestConfig(payload: InlineTranslatePayload): Promise<InlineTranslateRequestConfig> {
+  // Optimization 1: Use cached config
+  const cachedConfig = await getCachedProviderConfig();
+
+  const provider = cachedConfig.provider;
+  const apiKey = cachedConfig.apiKey;
+  const baseUrl = cachedConfig.baseUrl;
+  const model = cachedConfig.model;
+  const targetLang = cachedConfig.targetLang || payload.targetLang || 'English';
+
+  const isChineseUI = payload.uiLang ? payload.uiLang === 'zh' : targetLang !== 'en';
+
+  if (!apiKey) {
+    throw new Error(isChineseUI ? '请先在设置页面配置 API Key' : 'Please configure API Key in settings');
+  }
+
+  const systemPrompt = `You are a professional translator. Your task is to translate text to ${targetLang}.
+
+【Rules】
+1. Output ONLY the translation, nothing else (no original text, no explanations);
+2. Keep the translation accurate and natural;
+3. Preserve the original meaning and tone;
+4. Use Markdown format for better readability;
+5. Do NOT use code blocks, inline code, or HTML tags;`;
+
+  const userPrompt = `Translate this text to ${targetLang}:
+
+${payload.selection}`;
+
+  const apiConfig = API_CONFIGS[provider];
+  const endpoint = provider === 'openai'
+    ? normalizeOpenAIEndpoint(baseUrl)
+    : `${baseUrl}${apiConfig.endpointPath}`;
+  const authHeader = apiConfig.authHeader === 'Bearer'
+    ? `Bearer ${apiKey}`
+    : apiKey;
+
+  const streamFormat = getStreamFormat(provider);
+  const requestBody = streamFormat === 'openai'
+    ? {
+        model: model,
+        max_tokens: 1024,
+        temperature: 0.1,
+        messages: [
+          { role: 'system', content: systemPrompt },
+          { role: 'user', content: userPrompt }
+        ],
+        stream: true
+      }
+    : {
+        model: model,
+        max_tokens: 1024,
+        temperature: 0.1,
+        system: systemPrompt,
+        messages: [
+          { role: 'user', content: userPrompt }
+        ],
+        stream: true
+      };
+
+  const headers: Record<string, string> = {
+    'Content-Type': 'application/json',
+    [apiConfig.authHeader === 'Bearer' ? 'Authorization' : 'x-api-key']: authHeader,
+    ...apiConfig.extraHeaders,
+  };
+
+  return {
+    provider,
+    streamFormat,
+    endpoint,
+    headers,
+    requestBody,
+  };
+}
+
+async function handleInlineTranslate(payload: InlineTranslatePayload, port: chrome.runtime.Port): Promise<void> {
+  const { streamFormat, endpoint, headers, requestBody } = await buildInlineTranslateRequestConfig(payload);
+
+  const controller = new AbortController();
+
+  // Timeout control
+  const timeoutId = setTimeout(() => {
+    controller.abort();
+    port.postMessage({ type: 'error', error: 'Request timeout (30s)' });
+  }, REQUEST_TIMEOUT);
+
+  // Cleanup when port disconnects
+  const onDisconnect = () => {
+    clearTimeout(timeoutId);
+    controller.abort();
+  };
+  port.onDisconnect.addListener(onDisconnect);
+
+  let doneSent = false;
+
+  try {
+    console.log('[Inline Translate] requestBody:', JSON.stringify(requestBody, null, 2));
+
+    const response = await fetch(endpoint, {
+      method: 'POST',
+      headers,
+      body: JSON.stringify(requestBody),
+      signal: controller.signal
+    });
+
+    if (!response.ok) {
+      throw new Error(await readErrorMessage(response));
+    }
+
+    const reader = response.body?.getReader();
+    if (!reader) {
+      throw new Error('Unable to read streaming response');
+    }
+
+    const decoder = new TextDecoder();
+    let buffer = '';
+
+    while (true) {
+      const { value, done } = await reader.read();
+      if (done) break;
+
+      buffer += decoder.decode(value, { stream: true });
+      const lines = buffer.split(/\r?\n/);
+      buffer = lines.pop() || '';
+
+      for (const line of lines) {
+        const trimmed = line.trim();
+        if (!trimmed || !trimmed.startsWith('data:')) continue;
+
+        const data = trimmed.slice(5).trim();
+        if (data === '[DONE]') {
+          doneSent = true;
+          port.postMessage({ type: 'done' });
+          return;
+        }
+
+        try {
+          const parsed = JSON.parse(data);
+          const result = streamFormat === 'openai'
+            ? parseOpenAIStreamPayload(parsed)
+            : parseAnthropicStreamPayload(parsed);
+          if (result.delta) {
+            port.postMessage({ type: 'delta', data: result.delta });
+          }
+          if (result.done) {
+            doneSent = true;
+            port.postMessage({ type: 'done' });
+            return;
+          }
+        } catch (error) {
+          console.warn('[Inline Translate] Stream chunk parse error:', error);
+        }
+      }
+    }
+
+    const remaining = buffer.trim();
+    if (remaining.startsWith('data:')) {
+      const data = remaining.slice(5).trim();
+      if (data === '[DONE]') {
+        doneSent = true;
+        port.postMessage({ type: 'done' });
+        return;
+      }
+      try {
+        const parsed = JSON.parse(data);
+        const result = streamFormat === 'openai'
+          ? parseOpenAIStreamPayload(parsed)
+          : parseAnthropicStreamPayload(parsed);
+        if (result.delta) {
+          port.postMessage({ type: 'delta', data: result.delta });
+        }
+        if (result.done) {
+          doneSent = true;
+          port.postMessage({ type: 'done' });
+          return;
+        }
+      } catch (error) {
+        console.warn('[Inline Translate] Stream tail parse error:', error);
+      }
+    }
+  } catch (error) {
+    if ((error as Error).name !== 'AbortError') {
+      port.postMessage({ type: 'error', error: (error as Error).message || String(error) });
+    }
+  } finally {
+    clearTimeout(timeoutId);
+    port.onDisconnect.removeListener(onDisconnect);
+    if (!doneSent) {
+      port.postMessage({ type: 'done' });
+    }
+  }
+}

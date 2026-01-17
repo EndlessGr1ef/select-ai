@@ -1,12 +1,12 @@
 import React, { useState, useEffect, useRef } from 'react';
 import ReactMarkdown from 'react-markdown';
 import { ContextExtractor } from '../utils/ContextExtractor';
-import { getUILanguage, isBrowserChinese } from '../utils/language';
+import { getUILanguage } from '../utils/language';
 import { translations } from '../utils/i18n';
 
 type Provider = 'openai' | 'anthropic' | 'minimax' | 'deepseek' | 'glm';
 
-const ContentApp: React.FC = () => {
+const ContentApp: React.FC<{ isSelectionBlocked: () => Promise<boolean> }> = ({ isSelectionBlocked }) => {
   const [selection, setSelection] = useState<string>('');
   const [position, setPosition] = useState<{ x: number; y: number }>({ x: 0, y: 0 });
   const [showDot, setShowDot] = useState(false);
@@ -14,10 +14,9 @@ const ContentApp: React.FC = () => {
   const [result, setResult] = useState<string>('');
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
-  const defaultTargetLang = isBrowserChinese() ? '中文' : 'English';
   const [modelName, setModelName] = useState('gpt-4o');
   const [lang, setLang] = useState<'zh' | 'en'>('zh');
-  const [targetLang, setTargetLang] = useState(defaultTargetLang);
+  const [targetLang, setTargetLang] = useState('中文');
   const [isTextExpanded, setIsTextExpanded] = useState(false);
 
   // Resize state for panel
@@ -45,7 +44,7 @@ const ContentApp: React.FC = () => {
     minimax: 'MiniMax-M2.1',
     deepseek: 'deepseek-chat',
     glm: 'glm-4.7',
-    anthropic: 'claude-sonnet-4-20250514',
+    anthropic: 'claude-sonnet-4-5',
     openai: 'gpt-4o',
   };
 
@@ -57,13 +56,13 @@ const ContentApp: React.FC = () => {
       const modelKey = `${providerValue}Model`;
       const modelResult = await chrome.storage.local.get([modelKey]);
       setModelName((modelResult[modelKey] as string) || defaultModels[providerValue]);
-      setTargetLang((result.targetLanguage as string) || defaultTargetLang);
+      setTargetLang((result.targetLanguage as string) || '中文');
     };
     getProviderConfig();
 
     const handleStorageChange = (changes: { [key: string]: chrome.storage.StorageChange }) => {
       if (changes.targetLanguage) {
-        setTargetLang((changes.targetLanguage.newValue as string) || defaultTargetLang);
+        setTargetLang((changes.targetLanguage.newValue as string) || '中文');
       }
       if (changes.selectedProvider) {
         const providerValue = (changes.selectedProvider.newValue as Provider) || 'openai';
@@ -96,7 +95,6 @@ const ContentApp: React.FC = () => {
 
   // Drag handlers for panel repositioning
   const handleDragStart = (e: React.MouseEvent) => {
-    // Prevent text selection during drag
     e.preventDefault();
     setIsDragging(true);
     dragStartRef.current = {
@@ -142,10 +140,10 @@ const ContentApp: React.FC = () => {
     e.stopPropagation();
     setIsResizing(true);
     setResizeDirection(direction);
-    
+
     const panelRect = panelRef.current?.getBoundingClientRect();
     if (!panelRect) return;
-    
+
     resizeStartRef.current = {
       mouseX: e.clientX,
       mouseY: e.clientY,
@@ -170,7 +168,6 @@ const ContentApp: React.FC = () => {
       let newOffsetX = resizeStartRef.current.startX;
       let newOffsetY = resizeStartRef.current.startY;
 
-      // Handle horizontal resize
       if (resizeDirection.includes('e')) {
         newWidth = Math.max(300, Math.min(800, resizeStartRef.current.startWidth + deltaX));
       } else if (resizeDirection.includes('w')) {
@@ -181,7 +178,6 @@ const ContentApp: React.FC = () => {
         }
       }
 
-      // Handle vertical resize
       if (resizeDirection.includes('s')) {
         newHeight = Math.max(300, Math.min(700, resizeStartRef.current.startHeight + deltaY));
       } else if (resizeDirection.includes('n')) {
@@ -212,9 +208,8 @@ const ContentApp: React.FC = () => {
   }, [isResizing, resizeDirection]);
 
   useEffect(() => {
-    const handleMouseUp = (e: MouseEvent) => {
+    const handleMouseUp = async (e: MouseEvent) => {
       if (isResizing || isDragging) return;
-      // Ignore if clicking on our own elements
       if (dotRef.current?.contains(e.target as Node) || panelRef.current?.contains(e.target as Node)) {
         return;
       }
@@ -223,17 +218,25 @@ const ContentApp: React.FC = () => {
       const text = sel?.toString().trim();
 
       if (text && text.length > 0) {
-        const range = sel?.getRangeAt(0);
-        const rect = range?.getBoundingClientRect();
+        const blocked = await isSelectionBlocked();
+        if (!blocked) {
+          const range = sel?.getRangeAt(0);
+          const rect = range?.getBoundingClientRect();
 
-        if (rect) {
-          setSelection(text);
-          setPosition({
-            x: rect.left + window.scrollX,  // Left edge of selection
-            y: rect.top + window.scrollY    // Top edge of selection
-          });
-          setShowDot(true);
-          setShowPanel(false);
+          if (rect) {
+            setSelection(text);
+            setPosition({
+              x: rect.left + window.scrollX,
+              y: rect.top + window.scrollY
+            });
+            setShowDot(true);
+            setShowPanel(false);
+          }
+        } else {
+          if (!panelRef.current?.contains(e.target as Node)) {
+            setShowDot(false);
+            if (!loading) setShowPanel(false);
+          }
         }
       } else {
         if (!panelRef.current?.contains(e.target as Node)) {
@@ -247,14 +250,20 @@ const ContentApp: React.FC = () => {
     return () => document.removeEventListener('mouseup', handleMouseUp);
   }, [loading, isResizing, isDragging]);
 
-  const handleTriggerQuery = () => {
+  const handleTriggerQuery = async () => {
+    // Check if selection is in blacklisted area
+    const blocked = await isSelectionBlocked();
+    if (blocked) {
+      console.log('[Select AI] Selection is in blocked area');
+      return;
+    }
+
     setShowDot(false);
     setShowPanel(true);
     setLoading(true);
     setError(null);
     setResult('');
     setIsTextExpanded(false);
-    // Reset drag offset and size when panel opens
     setDragOffset({ x: 0, y: 0 });
     setPanelSize({ width: 400, height: 450 });
 
@@ -263,7 +272,6 @@ const ContentApp: React.FC = () => {
     const pageUrl = window.location.href;
     const pageTitle = document.title;
 
-    // Check if extension context is still valid
     if (!chrome.runtime?.id) {
       setLoading(false);
       setError(t.extUpdated[lang]);
@@ -326,14 +334,14 @@ const ContentApp: React.FC = () => {
     position: 'fixed',
     left: position.x,
     top: position.y - window.scrollY,
-    transform: 'translate(-100%, -100%)',  // Position to top-left corner
+    transform: 'translate(-100%, -100%)',
     cursor: 'pointer',
     zIndex: 2147483647,
     padding: 3,
   };
 
   const dotInnerStyle: React.CSSProperties = {
-    width: 10,  // Reduced from 14px (about 1/4 smaller)
+    width: 10,
     height: 10,
     background: 'linear-gradient(135deg, #ef4444 0%, #8b5cf6 100%)',
     borderRadius: '50%',
@@ -483,7 +491,6 @@ const ContentApp: React.FC = () => {
     justifyContent: 'center',
   };
 
-  // Resize handle styles
   const resizeHandleStyle: React.CSSProperties = {
     position: 'absolute',
     backgroundColor: 'transparent',
@@ -497,34 +504,34 @@ const ContentApp: React.FC = () => {
   const parseXmlResponse = (text: string, uiLang: 'zh' | 'en'): string => {
     const baseMatch = text.match(/<base>([\s\S]*?)<\/base>/);
     const contextMatch = text.match(/<context>([\s\S]*?)<\/context>/);
-    
+
     if (baseMatch || contextMatch) {
       const baseLabel = uiLang === 'zh' ? '基础含义' : 'Base meaning';
       const contextLabel = uiLang === 'zh' ? '上下文含义' : 'Contextual meaning';
-      
+
       let formatted = '';
       if (baseMatch) formatted += `**${baseLabel}:** ${baseMatch[1].trim()}\n\n`;
       if (contextMatch) formatted += `**${contextLabel}:** ${contextMatch[1].trim()}`;
       return formatted;
     }
-    return text; // fallback to original if parsing fails
+    return text;
   };
 
   // Strip markdown symbols for speech
   const stripMarkdown = (text: string): string => {
     return text
-      .replace(/#{1,6}\s+/g, '') // Remove headings
-      .replace(/\*\*/g, '') // Remove bold
-      .replace(/\*/g, '') // Remove italic
-      .replace(/`{1,3}[^`]*`{1,3}/g, '') // Remove code blocks and inline code
-      .replace(/\[([^\]]+)\]\([^)]+\)/g, '$1') // Remove links, keep text
-      .replace(/!\[([^\]]*)\]\([^)]+\)/g, '$1') // Remove images, keep alt text
-      .replace(/^\s*[-*+]\s+/gm, '') // Remove list markers
-      .replace(/^\s*\d+\.\s+/gm, '') // Remove numbered list markers
-      .replace(/^\s*>/gm, '') // Remove blockquotes
-      .replace(/---/g, '') // Remove horizontal rules
-      .replace(/\n+/g, ' ') // Replace newlines with spaces
-      .replace(/\s+/g, ' ') // Collapse multiple spaces
+      .replace(/#{1,6}\s+/g, '')
+      .replace(/\*\*/g, '')
+      .replace(/\*/g, '')
+      .replace(/`{1,3}[^`]*`{1,3}/g, '')
+      .replace(/\[([^\]]+)\]\([^)]+\)/g, '$1')
+      .replace(/!\[([^\]]*)\]\([^)]+\)/g, '$1')
+      .replace(/^\s*[-*+]\s+/gm, '')
+      .replace(/^\s*\d+\.\s+/gm, '')
+      .replace(/^\s*>/gm, '')
+      .replace(/---/g, '')
+      .replace(/\n+/g, ' ')
+      .replace(/\s+/g, ' ')
       .trim();
   };
 
@@ -534,7 +541,6 @@ const ContentApp: React.FC = () => {
     const synthesis = window.speechSynthesis;
     if (!synthesis) return;
 
-    // Cancel any ongoing speech
     synthesis.cancel();
 
     const parsedResult = parseXmlResponse(result, lang);
@@ -589,7 +595,7 @@ const ContentApp: React.FC = () => {
             style={{ ...resizeHandleStyle, bottom: 0, right: 0, width: cornerSize, height: cornerSize, cursor: 'se-resize' }}
             onMouseDown={(e) => handleResizeStart(e, 'se')}
           />
-          
+
           {/* Resize handles - edges */}
           <div
             style={{ ...resizeHandleStyle, top: 0, left: cornerSize, right: cornerSize, height: edgeSize, cursor: 'n-resize' }}

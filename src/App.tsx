@@ -20,7 +20,7 @@ const PROVIDER_CONFIGS: Record<Provider, ProviderConfig> = {
   },
   anthropic: {
     defaultBaseUrl: 'https://api.anthropic.com/v1/messages',
-    defaultModel: 'claude-sonnet-4-20250514',
+    defaultModel: 'claude-sonnet-4-5',
     storageKey: 'anthropic',
   },
   minimax: {

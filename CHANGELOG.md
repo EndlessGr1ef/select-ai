@@ -1,5 +1,14 @@
 # Changelog / 更新日志
 
+## [0.3.0] - 2026-01-17
+
+### Changed / 改进
+- Internationalized all code comments to English / 将所有代码注释国际化为英文
+- Updated 7 files with 100+ comment translations / 更新了 7 个文件中的 100+ 条注释翻译
+- Improved code maintainability and international collaboration / 提升代码可维护性和国际化协作
+
+---
+
 ## [0.2.0] - 2026-01-10
 
 ### Added / 新增

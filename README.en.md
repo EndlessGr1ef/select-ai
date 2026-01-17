@@ -28,6 +28,35 @@
 | 💬 **Markdown Rendering** | AI responses displayed in beautiful Markdown format | Clear, readable output |
 | 🔒 **Privacy First** | API keys stored locally, no user data collection | Secure usage |
 
+## 🌐 Global Translation
+
+Floating button at bottom-right for full-page or selected text translation.
+
+### Key Features
+
+| Feature | Description |
+|---------|-------------|
+| 🎯 **Floating Button** | Draggable, click to translate |
+| 📄 **Full Page** | Auto-detect content, batch translate paragraphs |
+| ✂️ **Selected Text** | Translate only selected text |
+| 💾 **Smart Cache** | Toggle display without re-requesting |
+| 🚀 **Concurrent** | Parallel translation for speed |
+| 🌍 **Language Detection** | Skip text matching target language |
+
+### Usage
+
+- **Full Page**: Ensure no text selected, click button
+- **Selected**: Select text, then click button
+- **Show/Hide**: Click button to toggle translations
+- **Drag**: Hold and drag to any position
+
+### Configuration
+
+Configure in "Translation Settings" tab:
+- **Target Language**: Chinese/English
+- **Concurrency**: Parallel paragraph count (default 10)
+- **Blacklist**: Enable/disable site blacklist
+
 ## 📖 Why Select AI?
 
 | Traditional Dictionaries | Select AI |

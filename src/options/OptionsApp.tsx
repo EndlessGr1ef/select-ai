@@ -73,7 +73,10 @@ function getDefaultTargetLanguage(): string {
   return isBrowserChinese() ? '中文' : 'English';
 }
 
+type TabType = 'api' | 'translation';
+
 const OptionsApp: React.FC = () => {
+  const [activeTab, setActiveTab] = useState<TabType>('api');
   const [provider, setProvider] = useState<Provider>('openai');
   const [apiKey, setApiKey] = useState('');
   const [baseUrl, setBaseUrl] = useState(PROVIDER_CONFIGS.minimax.defaultBaseUrl);
@@ -85,15 +88,21 @@ const OptionsApp: React.FC = () => {
   const [isLoading, setIsLoading] = useState(true);
   const [showModelOptions, setShowModelOptions] = useState(false);
   const modelBlurTimeoutRef = useRef<number | null>(null);
+  // Translation settings
+  const [concurrency, setConcurrency] = useState(10);
+  const [blacklistEnabled, setBlacklistEnabled] = useState(true);
 
   // Initialize: load language and selected provider
   useEffect(() => {
     setLang(getUILanguage());
-    chrome.storage.local.get(['selectedProvider', 'targetLanguage'], (result) => {
+    chrome.storage.local.get(['selectedProvider', 'targetLanguage', 'translationConcurrency', 'translationBlacklistEnabled'], (result) => {
       if (result.selectedProvider) {
         setProvider(result.selectedProvider as Provider);
       }
       setTargetLang((result.targetLanguage as string) || getDefaultTargetLanguage());
+      setConcurrency((result.translationConcurrency as number) || 10);
+      setBlacklistEnabled(result.translationBlacklistEnabled !== false);
+
       setIsLoading(false);
     });
   }, []);
@@ -123,7 +132,9 @@ const OptionsApp: React.FC = () => {
       [`${providerStorageKey}ApiKey`]: apiKey,
       [`${providerStorageKey}BaseUrl`]: baseUrl,
       [`${providerStorageKey}Model`]: model,
-      targetLanguage: targetLang
+      targetLanguage: targetLang,
+      translationConcurrency: concurrency,
+      translationBlacklistEnabled: blacklistEnabled
     }, () => {
       setStatus({ type: 'success', message: t.saveSuccess[lang] });
       setTimeout(() => setStatus({ type: 'idle', message: '' }), 3000);
@@ -183,6 +194,27 @@ const OptionsApp: React.FC = () => {
     opacity: 0.8,
     marginTop: 4,
   };
+
+  const tabContainerStyle: React.CSSProperties = {
+    display: 'flex',
+    gap: 8,
+    marginTop: 20,
+  };
+
+  const getTabStyle = (isActive: boolean): React.CSSProperties => ({
+    padding: '10px 20px',
+    borderRadius: 10,
+    fontSize: 14,
+    fontWeight: 500,
+    cursor: 'pointer',
+    border: 'none',
+    backgroundColor: isActive ? 'rgba(255,255,255,0.2)' : 'transparent',
+    color: '#fff',
+    transition: 'all 0.2s',
+    display: 'flex',
+    alignItems: 'center',
+    gap: 8,
+  });
 
   const formStyle: React.CSSProperties = {
     padding: 32,
@@ -390,11 +422,48 @@ const OptionsApp: React.FC = () => {
               <p style={subtitleStyle}>{t.subtitle[lang]}</p>
             </div>
           </div>
+          {/* Tab Navigation */}
+          <div style={tabContainerStyle}>
+            <button
+              style={getTabStyle(activeTab === 'api')}
+              onClick={() => setActiveTab('api')}
+              onMouseOver={(e) => {
+                if (activeTab !== 'api') {
+                  e.currentTarget.style.backgroundColor = 'rgba(255,255,255,0.1)';
+                }
+              }}
+              onMouseOut={(e) => {
+                if (activeTab !== 'api') {
+                  e.currentTarget.style.backgroundColor = 'transparent';
+                }
+              }}
+            >
+              <span>✨</span> {t.tabApiConfig[lang]}
+            </button>
+            <button
+              style={getTabStyle(activeTab === 'translation')}
+              onClick={() => setActiveTab('translation')}
+              onMouseOver={(e) => {
+                if (activeTab !== 'translation') {
+                  e.currentTarget.style.backgroundColor = 'rgba(255,255,255,0.1)';
+                }
+              }}
+              onMouseOut={(e) => {
+                if (activeTab !== 'translation') {
+                  e.currentTarget.style.backgroundColor = 'transparent';
+                }
+              }}
+            >
+              <span>✨</span> {t.tabTranslationSettings[lang]}
+            </button>
+          </div>
         </div>
 
         <div style={formStyle}>
-          {/* API Section */}
-          <div style={sectionStyle}>
+          {/* API Config Tab */}
+          {activeTab === 'api' && (
+            <React.Fragment>
+            <div style={sectionStyle}>
             <div style={sectionTitleStyle}>
               <span>🔑</span> {t.apiSection[lang]}
             </div>
@@ -580,6 +649,53 @@ const OptionsApp: React.FC = () => {
               </div>
             </div>
           </div>
+            </React.Fragment>
+          )}
+
+          {/* Translation Settings Tab */}
+          {activeTab === 'translation' && (
+            <div style={sectionStyle}>
+              <div style={sectionTitleStyle}>
+                <span>🌐</span> {t.translationSettingsTitle[lang]}
+              </div>
+
+              {/* Concurrency Setting */}
+              <div style={{ marginBottom: 24 }}>
+                <label style={labelStyle}>{t.concurrencyLabel[lang]}</label>
+                <input
+                  type="number"
+                  min={1}
+                  max={20}
+                  value={concurrency}
+                  onChange={(e) => setConcurrency(Math.max(1, Math.min(20, parseInt(e.target.value) || 1)))}
+                  style={inputStyle}
+                  onFocus={(e) => {
+                    e.target.style.borderColor = '#3b82f6';
+                    e.target.style.boxShadow = '0 0 0 3px rgba(59,130,246,0.1)';
+                  }}
+                  onBlur={(e) => {
+                    e.target.style.borderColor = '#e5e7eb';
+                    e.target.style.boxShadow = 'none';
+                  }}
+                />
+                <p style={hintStyle}>{t.concurrencyHint[lang]}</p>
+              </div>
+
+              {/* Blacklist Toggle */}
+              <div>
+                <label style={{ ...labelStyle, display: 'flex', alignItems: 'center', gap: 12 }}>
+                  <input
+                    type="checkbox"
+                    checked={blacklistEnabled}
+                    onChange={(e) => setBlacklistEnabled(e.target.checked)}
+                    style={{ width: 20, height: 20, cursor: 'pointer' }}
+                  />
+                  {t.blacklistToggleLabel[lang]}
+                </label>
+                <p style={{ ...hintStyle, marginLeft: 32 }}>{t.blacklistToggleHint[lang]}</p>
+              </div>
+            </div>
+          )}
 
           {/* Save Button */}
           <button
@@ -605,9 +721,15 @@ const OptionsApp: React.FC = () => {
           <div style={infoCardStyle}>
             <div style={infoTitleStyle}>{t.guideTitle[lang]}</div>
             <ul style={infoListStyle}>
-              {(t.guideSteps as Record<string, string[]>)[lang].map((step, i) => (
-                <li key={i}>{step}</li>
-              ))}
+              {activeTab === 'api' ? (
+                (t.guideSteps as Record<string, string[]>)[lang].map((step, i) => (
+                  <li key={i}>{step}</li>
+                ))
+              ) : (
+                (t.translationGuideSteps as Record<string, string[]>)[lang].map((step, i) => (
+                  <li key={i}>{step}</li>
+                ))
+              )}
             </ul>
           </div>
         </div>
