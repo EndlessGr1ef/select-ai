@@ -236,25 +236,25 @@ ${isChineseTarget ? '请解释上面选中的内容。' : 'Please explain the se
   const streamFormat = getStreamFormat(provider);
   const requestBody = streamFormat === 'openai'
     ? {
-        model: model,
-        max_tokens: 1024,
-        temperature: 0.1,
-        messages: [
-          { role: 'system', content: systemPrompt },
-          { role: 'user', content: userPrompt }
-        ],
-        stream: true
-      }
+      model: model,
+      max_tokens: 1024,
+      temperature: 0.1,
+      messages: [
+        { role: 'system', content: systemPrompt },
+        { role: 'user', content: userPrompt }
+      ],
+      stream: true
+    }
     : {
-        model: model,
-        max_tokens: 1024,
-        temperature: 0.1,
-        system: systemPrompt,
-        messages: [
-          { role: 'user', content: userPrompt }
-        ],
-        stream: true
-      };
+      model: model,
+      max_tokens: 1024,
+      temperature: 0.1,
+      system: systemPrompt,
+      messages: [
+        { role: 'user', content: userPrompt }
+      ],
+      stream: true
+    };
 
   const headers: Record<string, string> = {
     'Content-Type': 'application/json',
@@ -458,8 +458,13 @@ chrome.runtime.onConnect.addListener((port) => {
       handleAIStream(message.payload as QueryPayload, port).catch((error) => {
         port.postMessage({ type: 'error', error: error.message || String(error) });
       });
+
     } else if (message?.action === 'inlineTranslate') {
       handleInlineTranslate(message.payload as InlineTranslatePayload, port).catch((error) => {
+        port.postMessage({ type: 'error', error: error.message || String(error) });
+      });
+    } else if (message?.action === 'inlineTranslateBatch') {
+      handleInlineTranslateBatch(message.payload as InlineTranslateBatchPayload, port).catch((error) => {
         port.postMessage({ type: 'error', error: error.message || String(error) });
       });
     }
@@ -468,6 +473,12 @@ chrome.runtime.onConnect.addListener((port) => {
 
 type InlineTranslatePayload = {
   selection: string;
+  targetLang?: string;
+  uiLang?: 'zh' | 'en';
+};
+
+type InlineTranslateBatchPayload = {
+  selections: string[];
   targetLang?: string;
   uiLang?: 'zh' | 'en';
 };
@@ -520,25 +531,97 @@ ${payload.selection}`;
   const streamFormat = getStreamFormat(provider);
   const requestBody = streamFormat === 'openai'
     ? {
-        model: model,
-        max_tokens: 1024,
-        temperature: 0.1,
-        messages: [
-          { role: 'system', content: systemPrompt },
-          { role: 'user', content: userPrompt }
-        ],
-        stream: true
-      }
+      model: model,
+      max_tokens: 1024,
+      temperature: 0.1,
+      messages: [
+        { role: 'system', content: systemPrompt },
+        { role: 'user', content: userPrompt }
+      ],
+      stream: true
+    }
     : {
-        model: model,
-        max_tokens: 1024,
-        temperature: 0.1,
-        system: systemPrompt,
-        messages: [
-          { role: 'user', content: userPrompt }
-        ],
-        stream: true
-      };
+      model: model,
+      max_tokens: 1024,
+      temperature: 0.1,
+      system: systemPrompt,
+      messages: [
+        { role: 'user', content: userPrompt }
+      ],
+      stream: true
+    };
+
+  const headers: Record<string, string> = {
+    'Content-Type': 'application/json',
+    [apiConfig.authHeader === 'Bearer' ? 'Authorization' : 'x-api-key']: authHeader,
+    ...apiConfig.extraHeaders,
+  };
+
+  return {
+    provider,
+    streamFormat,
+    endpoint,
+    headers,
+    requestBody,
+  };
+}
+
+async function buildInlineTranslateBatchRequestConfig(payload: InlineTranslateBatchPayload): Promise<InlineTranslateRequestConfig> {
+  const cachedConfig = await getCachedProviderConfig();
+
+  const provider = cachedConfig.provider;
+  const apiKey = cachedConfig.apiKey;
+  const baseUrl = cachedConfig.baseUrl;
+  const model = cachedConfig.model;
+  const targetLang = cachedConfig.targetLang || payload.targetLang || 'English';
+
+  const isChineseUI = payload.uiLang ? payload.uiLang === 'zh' : targetLang !== 'en';
+
+  if (!apiKey) {
+    throw new Error(isChineseUI ? '请先在设置页面配置 API Key' : 'Please configure API Key in settings');
+  }
+
+  const systemPrompt = `You are a professional translator. Your task is to translate a JSON array of texts to ${targetLang}.
+
+【Rules】
+1. You will receive a JSON array of strings.
+2. You must return a valid JSON array of strings containing the translations.
+3. The order of translations MUST match the original array.
+4. Output ONLY the JSON array, nothing else (no code blocks, no explanations).
+5. Ensure the JSON is valid (properly escaped).`;
+
+  const userPrompt = JSON.stringify(payload.selections);
+
+  const apiConfig = API_CONFIGS[provider];
+  const endpoint = provider === 'openai'
+    ? normalizeOpenAIEndpoint(baseUrl)
+    : `${baseUrl}${apiConfig.endpointPath}`;
+  const authHeader = apiConfig.authHeader === 'Bearer'
+    ? `Bearer ${apiKey}`
+    : apiKey;
+
+  const streamFormat = getStreamFormat(provider);
+  const requestBody = streamFormat === 'openai'
+    ? {
+      model: model,
+      max_tokens: 4096,
+      temperature: 0.1,
+      messages: [
+        { role: 'system', content: systemPrompt },
+        { role: 'user', content: userPrompt }
+      ],
+      stream: true
+    }
+    : {
+      model: model,
+      max_tokens: 4096,
+      temperature: 0.1,
+      system: systemPrompt,
+      messages: [
+        { role: 'user', content: userPrompt }
+      ],
+      stream: true
+    };
 
   const headers: Record<string, string> = {
     'Content-Type': 'application/json',
@@ -670,5 +753,102 @@ async function handleInlineTranslate(payload: InlineTranslatePayload, port: chro
     if (!doneSent) {
       port.postMessage({ type: 'done' });
     }
+  }
+}
+
+async function handleInlineTranslateBatch(payload: InlineTranslateBatchPayload, port: chrome.runtime.Port): Promise<void> {
+  const { streamFormat, endpoint, headers, requestBody } = await buildInlineTranslateBatchRequestConfig(payload);
+
+  const controller = new AbortController();
+  const timeoutId = setTimeout(() => {
+    controller.abort();
+    port.postMessage({ type: 'error', error: 'Request timeout (45s)' });
+  }, 45000); // Longer timeout for batch
+
+  const onDisconnect = () => {
+    clearTimeout(timeoutId);
+    controller.abort();
+  };
+  port.onDisconnect.addListener(onDisconnect);
+
+  let doneSent = false;
+
+  try {
+    const response = await fetch(endpoint, {
+      method: 'POST',
+      headers,
+      body: JSON.stringify(requestBody),
+      signal: controller.signal
+    });
+
+    if (!response.ok) throw new Error(await readErrorMessage(response));
+
+    const reader = response.body?.getReader();
+    if (!reader) throw new Error('Unable to read streaming response');
+
+    const decoder = new TextDecoder();
+    let buffer = '';
+
+    while (true) {
+      const { value, done } = await reader.read();
+      if (done) break;
+
+      buffer += decoder.decode(value, { stream: true });
+      const lines = buffer.split(/\r?\n/);
+      buffer = lines.pop() || '';
+
+      for (const line of lines) {
+        const trimmed = line.trim();
+        if (!trimmed || !trimmed.startsWith('data:')) continue;
+        const data = trimmed.slice(5).trim();
+        if (data === '[DONE]') {
+          doneSent = true;
+          port.postMessage({ type: 'done' });
+          return;
+        }
+        try {
+          const parsed = JSON.parse(data);
+          const result = streamFormat === 'openai'
+            ? parseOpenAIStreamPayload(parsed)
+            : parseAnthropicStreamPayload(parsed);
+          if (result.delta) port.postMessage({ type: 'delta', data: result.delta });
+          if (result.done) {
+            doneSent = true;
+            port.postMessage({ type: 'done' });
+            return;
+          }
+        } catch { }
+      }
+    }
+    // Handle remaining buffer same as above (omitted for brevity, assume stream ends cleanly usually)
+    const remaining = buffer.trim();
+    if (remaining.startsWith('data:')) {
+      const data = remaining.slice(5).trim();
+      if (data === '[DONE]') {
+        doneSent = true;
+        port.postMessage({ type: 'done' });
+        return;
+      }
+      try {
+        const parsed = JSON.parse(data);
+        const result = streamFormat === 'openai'
+          ? parseOpenAIStreamPayload(parsed)
+          : parseAnthropicStreamPayload(parsed);
+        if (result.delta) port.postMessage({ type: 'delta', data: result.delta });
+        if (result.done) {
+          doneSent = true;
+          port.postMessage({ type: 'done' });
+          return;
+        }
+      } catch { }
+    }
+  } catch (error) {
+    if ((error as Error).name !== 'AbortError') {
+      port.postMessage({ type: 'error', error: (error as Error).message || String(error) });
+    }
+  } finally {
+    clearTimeout(timeoutId);
+    port.onDisconnect.removeListener(onDisconnect);
+    if (!doneSent) port.postMessage({ type: 'done' });
   }
 }

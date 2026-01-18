@@ -4,6 +4,8 @@ import { translations } from '../utils/i18n';
 import { SiteBlacklist } from '../utils/SiteBlacklist';
 import { ContentPriority } from '../utils/ContentPriority';
 
+const INLINE_DISPLAY_THRESHOLD = 100;
+
 interface InlineTranslatorProps {
   blacklist: SiteBlacklist;
 }
@@ -15,15 +17,15 @@ const InlineTranslator: React.FC<InlineTranslatorProps> = ({ blacklist }) => {
   const defaultTargetLang = isBrowserChinese() ? '中文' : 'English';
   const [targetLang, setTargetLang] = useState(defaultTargetLang);
   const streamPortRef = useRef<chrome.runtime.Port | null>(null);
-  const translationCache = useRef<Map<string, string>>(new Map());
+  const translationCache = useRef<Map<string, { text: string; originalHTML?: string }>>(new Map());
   const translatedIdsRef = useRef<Set<string>>(new Set());
 
-  // Drag state
   const [position, setPosition] = useState({ x: window.innerWidth - 48, y: window.innerHeight / 2 - 24 });
   const [isDragging, setIsDragging] = useState(false);
   const dragStartRef = useRef<{ offsetX: number; offsetY: number; startX: number; startY: number } | null>(null);
   const buttonRef = useRef<HTMLDivElement>(null);
   const wasDraggingRef = useRef(false);
+  const abortRef = useRef(false);
 
   const t = translations.content;
 
@@ -31,7 +33,6 @@ const InlineTranslator: React.FC<InlineTranslatorProps> = ({ blacklist }) => {
     setLang(getUILanguage());
   }, []);
 
-  // Load target language settings
   useEffect(() => {
     const getTargetLang = async () => {
       const result = await chrome.storage.local.get(['targetLanguage']);
@@ -49,7 +50,6 @@ const InlineTranslator: React.FC<InlineTranslatorProps> = ({ blacklist }) => {
     return () => chrome.storage.onChanged.removeListener(handleStorageChange);
   }, []);
 
-  // Drag handling
   const handleDragStart = (e: React.MouseEvent) => {
     e.preventDefault();
     setIsDragging(true);
@@ -71,7 +71,6 @@ const InlineTranslator: React.FC<InlineTranslatorProps> = ({ blacklist }) => {
     const handleDragMove = (e: MouseEvent) => {
       if (!dragStartRef.current) return;
 
-      // Check if significant drag occurred (moved more than 5 pixels)
       const distance = Math.sqrt(
         Math.pow(e.clientX - dragStartRef.current.startX, 2) +
         Math.pow(e.clientY - dragStartRef.current.startY, 2)
@@ -108,7 +107,6 @@ const InlineTranslator: React.FC<InlineTranslatorProps> = ({ blacklist }) => {
     }
   };
 
-  // Hide all translation containers
   const hideAllTranslations = useCallback(() => {
     translatedIdsRef.current.forEach(id => {
       const container = document.getElementById(id);
@@ -119,53 +117,6 @@ const InlineTranslator: React.FC<InlineTranslatorProps> = ({ blacklist }) => {
     });
   }, []);
 
-  // Clear all translation containers and cache
-  const clearAllTranslations = useCallback(() => {
-    translatedIdsRef.current.forEach(id => {
-      const container = document.getElementById(id);
-      if (container) container.remove();
-    });
-    translatedIdsRef.current.clear();
-    translationCache.current.clear();
-  }, []);
-
-  // Show all translation containers (restore from cache)
-  const showAllTranslations = useCallback(() => {
-    translatedIdsRef.current.forEach(id => {
-      const container = document.getElementById(id);
-      const cachedTranslation = translationCache.current.get(id);
-      if (container && cachedTranslation) {
-        const contentDiv = container.querySelector('.translation-content') as HTMLElement;
-        const loadingDiv = container.querySelector('.translation-loading') as HTMLElement;
-        if (contentDiv) {
-          const parsed = parseMarkdown(cachedTranslation);
-          contentDiv.innerHTML = parsed;
-          contentDiv.style.display = 'block';
-          if (loadingDiv) loadingDiv.style.display = 'none';
-        }
-        container.style.display = 'block';
-        setTimeout(() => container.classList.add('show'), 10);
-      }
-    });
-  }, []);
-
-  // Update translation content
-  const updateTranslation = useCallback((id: string, text: string) => {
-    const container = document.getElementById(id);
-    if (container) {
-      const contentDiv = container.querySelector('.translation-content') as HTMLElement;
-      const loadingDiv = container.querySelector('.translation-loading') as HTMLElement;
-      if (contentDiv) {
-        const parsed = parseMarkdown(text);
-        contentDiv.innerHTML = parsed;
-        contentDiv.style.display = 'block';
-        if (loadingDiv) loadingDiv.style.display = 'none';
-        container.classList.add('show');
-      }
-    }
-  }, []);
-
-  // Simple markdown parsing
   const parseMarkdown = useCallback((text: string): string => {
     return text
       .replace(/\*\*(.*?)\*\*/g, '<strong>$1</strong>')
@@ -173,22 +124,164 @@ const InlineTranslator: React.FC<InlineTranslatorProps> = ({ blacklist }) => {
       .replace(/`([^`]+)`/g, '<code style="background: #e2e8f0; padding: 2px 6px; border-radius: 4px; font-family: monospace;">$1</code>');
   }, []);
 
-  // Translate single paragraph
+  const applyTranslationToStructure = useCallback((originalHTML: string, translatedText: string): string => {
+    if (!originalHTML.includes('<') || !originalHTML.includes('>')) {
+      return translatedText;
+    }
+
+    try {
+      const parser = new DOMParser();
+      const doc = parser.parseFromString(originalHTML, 'text/html');
+      let originalText = '';
+      const collectText = (node: Node) => {
+        if (node.nodeType === Node.TEXT_NODE) {
+          originalText += node.textContent || '';
+        } else if (node.nodeType === Node.ELEMENT_NODE) {
+          for (const child of node.childNodes) {
+            collectText(child);
+          }
+        }
+      };
+      collectText(doc.body);
+
+      if (!originalText.trim()) {
+        return translatedText;
+      }
+
+      const translateNodes = (node: Node, translatedIdx: { current: number }) => {
+        if (node.nodeType === Node.TEXT_NODE) {
+          const textLen = node.textContent?.length || 0;
+          if (textLen > 0) {
+            const startIdx = translatedIdx.current;
+            const endIdx = startIdx + textLen;
+            if (startIdx < translatedText.length) {
+              node.textContent = translatedText.slice(startIdx);
+            }
+            translatedIdx.current = endIdx;
+          }
+        } else if (node.nodeType === Node.ELEMENT_NODE) {
+          for (const child of Array.from(node.childNodes)) {
+            translateNodes(child, translatedIdx);
+          }
+        }
+      };
+
+      translateNodes(doc.body, { current: 0 });
+      return doc.body.innerHTML;
+    } catch (e) {
+      return translatedText;
+    }
+  }, []);
+
+  const clearAllTranslations = useCallback(() => {
+    translatedIdsRef.current.forEach(id => {
+      const container = document.getElementById(id);
+      if (container) {
+        const parent = container.parentElement;
+        if (parent?.hasAttribute('data-select-ai-inline-mode')) {
+          parent.removeAttribute('data-select-ai-translated');
+          parent.removeAttribute('data-select-ai-inline-mode');
+        }
+        container.remove();
+      }
+    });
+    translatedIdsRef.current.clear();
+    translationCache.current.clear();
+  }, []);
+
+  const showAllTranslations = useCallback(() => {
+    translatedIdsRef.current.forEach(id => {
+      const container = document.getElementById(id);
+      const cachedTranslation = translationCache.current.get(id);
+      if (container && cachedTranslation) {
+        const contentDiv = container.querySelector('.translation-content') as HTMLElement;
+        const loadingDiv = container.querySelector('.translation-loading') as HTMLElement;
+        const isInlineMode = container.classList.contains('inline-mode');
+        const originalHTML = container.getAttribute('data-original-html') || undefined;
+        if (contentDiv) {
+          const parsed = parseMarkdown(cachedTranslation.text);
+          const finalHTML = originalHTML ? applyTranslationToStructure(originalHTML, parsed) : parsed;
+          contentDiv.innerHTML = finalHTML;
+          contentDiv.style.display = isInlineMode ? 'inline' : 'block';
+          if (loadingDiv) loadingDiv.style.display = 'none';
+        }
+        container.style.display = isInlineMode ? 'inline' : 'block';
+        setTimeout(() => container.classList.add('show'), 10);
+      }
+    });
+  }, [parseMarkdown, applyTranslationToStructure]);
+
+  const updateTranslation = useCallback((id: string, text: string, originalHTML?: string) => {
+    const container = document.getElementById(id);
+    if (container) {
+      const contentDiv = container.querySelector('.translation-content') as HTMLElement;
+      const loadingDiv = container.querySelector('.translation-loading') as HTMLElement;
+      const isInlineMode = container.classList.contains('inline-mode');
+      if (contentDiv) {
+        const parsed = parseMarkdown(text);
+        const finalHTML = originalHTML ? applyTranslationToStructure(originalHTML, parsed) : parsed;
+        contentDiv.innerHTML = finalHTML;
+        contentDiv.style.display = isInlineMode ? 'inline' : 'block';
+        if (loadingDiv) loadingDiv.style.display = 'none';
+        container.classList.add('show');
+      }
+    }
+  }, [parseMarkdown, applyTranslationToStructure]);
+
+  const getDirectTextContent = useCallback((element: Element): string => {
+    let text = '';
+    for (const node of element.childNodes) {
+      if (node.nodeType === Node.TEXT_NODE) {
+        text += node.textContent || '';
+      } else if (node.nodeType === Node.ELEMENT_NODE) {
+        const el = node as Element;
+        const tagName = el.tagName.toLowerCase();
+        if (['span', 'a', 'strong', 'b', 'em', 'i', 'code'].includes(tagName)) {
+          const outerHTML = el.outerHTML;
+          text += outerHTML;
+        } else {
+          text += el.textContent || '';
+        }
+      }
+    }
+    return text.trim();
+  }, []);
+
+  const hasNestedList = useCallback((element: Element): boolean => {
+    return element.querySelector('ul, ol') !== null;
+  }, []);
+
+  const shouldUseInlineMode = useCallback((element: Element, text: string): boolean => {
+    if (text.length > INLINE_DISPLAY_THRESHOLD) return false;
+
+    const tagName = element.tagName.toLowerCase();
+    const inlineSuitableTags = ['h1', 'h2', 'h3', 'h4', 'h5', 'h6', 'li', 'dt', 'th', 'td', 'a'];
+    if (!inlineSuitableTags.includes(tagName)) return false;
+
+    const rect = element.getBoundingClientRect();
+    const parentWidth = element.parentElement?.getBoundingClientRect().width || window.innerWidth;
+    const estimatedTranslationWidth = rect.width * 0.9;
+    const availableWidth = parentWidth - rect.width;
+
+    return availableWidth >= parentWidth * 0.25 || availableWidth >= estimatedTranslationWidth + 40;
+  }, []);
+
   const translateElement = useCallback(async (
     element: Element,
-    id: string
+    id: string,
+    directText?: string,
+    originalHTML?: string
   ): Promise<void> => {
-    const text = element.textContent?.trim() || '';
+    const text = directText || element.textContent?.trim() || '';
     if (!text) {
       const container = document.getElementById(id);
       if (container) container.remove();
       return;
     }
 
-    // Detect text language, skip if same as target language
     const detectedLang = detectTextLanguage(text);
     const isSameLang = (detectedLang === 'zh' && targetLang.startsWith('中文')) ||
-                       (detectedLang === 'en' && targetLang === 'English');
+      (detectedLang === 'en' && targetLang === 'English');
 
     if (isSameLang) {
       const container = document.getElementById(id);
@@ -209,7 +302,6 @@ const InlineTranslator: React.FC<InlineTranslatorProps> = ({ blacklist }) => {
             port.onMessage.removeListener(messageHandler);
             port.onDisconnect.removeListener(disconnectHandler);
           } catch (e) {
-            // Ignore cleanup errors
           }
         }
       };
@@ -224,22 +316,30 @@ const InlineTranslator: React.FC<InlineTranslatorProps> = ({ blacklist }) => {
       };
 
       const messageHandler = (message: any) => {
+        if (abortRef.current) {
+          cleanup();
+          if (!resolved) {
+            resolved = true;
+            try { port?.disconnect(); } catch (e) { }
+            resolve();
+          }
+          return;
+        }
+
         if (message?.type === 'delta') {
           fullTranslation += message.data || '';
-          updateTranslation(id, fullTranslation);
+          updateTranslation(id, fullTranslation, originalHTML);
         } else if (message?.type === 'done') {
           if (!resolved) {
             resolved = true;
-            // Save translation result to cache
             if (fullTranslation) {
-              translationCache.current.set(id, fullTranslation);
+              translationCache.current.set(id, { text: fullTranslation, originalHTML });
               translatedIdsRef.current.add(id);
             }
             cleanup();
             try {
               port?.disconnect();
             } catch (e) {
-              // Ignore disconnect errors
             }
             resolve();
           }
@@ -255,7 +355,6 @@ const InlineTranslator: React.FC<InlineTranslatorProps> = ({ blacklist }) => {
             try {
               port?.disconnect();
             } catch (e) {
-              // Ignore disconnect errors
             }
             resolve();
           }
@@ -265,12 +364,12 @@ const InlineTranslator: React.FC<InlineTranslatorProps> = ({ blacklist }) => {
       let fullTranslation = '';
 
       const tryConnect = (attempt: number) => {
-        if (resolved || attempt > 3) {
+        if (resolved || attempt > 3 || abortRef.current) {
           if (!resolved) {
             resolved = true;
             const container = document.getElementById(id);
             if (container) {
-              container.innerHTML = `<span style="color: #dc2626;">${t.errorTitle[lang]} Connection failed after ${attempt} attempts</span>`;
+              container.innerHTML = `<span style="color: #dc2626;">${t.errorTitle[lang]} Connection failed</span>`;
               container.classList.add('show');
             }
           }
@@ -279,7 +378,6 @@ const InlineTranslator: React.FC<InlineTranslatorProps> = ({ blacklist }) => {
         }
 
         try {
-          // Check if chrome.runtime is available
           if (!chrome.runtime?.id) {
             throw new Error('Extension context invalidated');
           }
@@ -297,13 +395,12 @@ const InlineTranslator: React.FC<InlineTranslatorProps> = ({ blacklist }) => {
           port.onDisconnect.addListener(disconnectHandler);
 
           setTimeout(() => {
-            if (!connected || !port || resolved) {
+            if (!connected || !port || resolved || abortRef.current) {
               return;
             }
             try {
               port.postMessage({ action: 'inlineTranslate', payload });
             } catch (e) {
-              console.error('[Inline Translate] Send error:', e);
               cleanup();
               if (!resolved) {
                 setTimeout(() => {
@@ -329,10 +426,11 @@ const InlineTranslator: React.FC<InlineTranslatorProps> = ({ blacklist }) => {
 
       tryConnect(0);
     });
-  }, [lang, targetLang, updateTranslation, t]);
+  }, [lang, targetLang, updateTranslation, t, abortRef]);
 
-  // Page inline translation handler
   const handleInlineTranslate = useCallback(async () => {
+    abortRef.current = false;
+
     const sel = window.getSelection();
     const selectedText = sel?.toString().trim();
 
@@ -348,30 +446,43 @@ const InlineTranslator: React.FC<InlineTranslatorProps> = ({ blacklist }) => {
       }
     } else {
       const textSelectors = [
-        'p', 'h1', 'h2', 'h3', 'h4', 'h5', 'h6',
-        'td', 'th', 'dd', 'dt', 'blockquote', 'article',
-        '.post', '.content', '.article', '.entry'
+        'p', 'h1', 'h2', 'h3', 'h4', 'h5', 'h6', 'li',
+        'td', 'th', 'dd', 'dt', 'blockquote', 'a'
       ].join(',');
+
+      const settings = await chrome.storage.local.get(['translationBlacklistEnabled']);
+      const isBlacklistEnabled = settings.translationBlacklistEnabled !== false;
 
       const allElements = Array.from(document.querySelectorAll(textSelectors))
         .filter(el => {
-          // Exclude elements in blacklist
-          if (blacklist.isElementBlocked(el)) return false;
+          if (isBlacklistEnabled) {
+            if (blacklist.isElementBlocked(el)) return false;
+          }
 
-          // Skip already translated elements
           if (el.hasAttribute('data-select-ai-translated')) return false;
-
-          // Skip elements with translated ancestors (avoid duplicate translation)
           if (el.closest('[data-select-ai-translated]')) return false;
 
+          const tagName = el.tagName.toLowerCase();
+          if (tagName === 'li' && hasNestedList(el)) {
+            const directText = getDirectTextContent(el);
+            if (!directText) return false;
+          }
+
           const text = el.textContent?.trim() || '';
-          return text.length > 0 && text.length < 5000 &&
-                 !ContentPriority.isExcluded(el) &&
-                 !el.querySelector('script, style');
+          return text.length > 0 && text.length < 5000 && !el.querySelector('script, style');
         });
 
-      // Sort by main content priority (elements in main content area first)
-      elementsToTranslate = ContentPriority.sortByMainContentPriority(allElements);
+      const filteredElements: Element[] = [];
+      for (const el of allElements) {
+        const hasVisibleChildInList = allElements.some(otherEl =>
+          otherEl !== el && el.contains(otherEl)
+        );
+        if (!hasVisibleChildInList) {
+          filteredElements.push(el);
+        }
+      }
+
+      elementsToTranslate = ContentPriority.sortByVisibility(filteredElements);
     }
 
     if (elementsToTranslate.length === 0) {
@@ -381,51 +492,35 @@ const InlineTranslator: React.FC<InlineTranslatorProps> = ({ blacklist }) => {
 
     setIsTranslating(true);
 
-    const elementIds: string[] = [];
+    const items: { element: Element; id: string; text: string; originalHTML?: string }[] = [];
 
-    // Create container for each element
     for (const element of elementsToTranslate) {
+      if (abortRef.current) break;
       const id = `translation-${Date.now()}-${Math.random().toString(36).substring(2, 11)}`;
-      elementIds.push(id);
 
-      // Inherit parent element styles
-      const computedStyle = window.getComputedStyle(element);
-      const inheritedStyles = `
-        color: ${computedStyle.color};
-        background-color: ${computedStyle.backgroundColor};
-        font-family: ${computedStyle.fontFamily};
-        font-size: ${computedStyle.fontSize};
-        font-weight: ${computedStyle.fontWeight};
-        line-height: ${computedStyle.lineHeight};
-        text-align: ${computedStyle.textAlign};
-      `;
+      const tagName = element.tagName.toLowerCase();
+      const hasNested = tagName === 'li' && hasNestedList(element);
+      const text = hasNested ? getDirectTextContent(element) : (element.textContent?.trim() || '');
 
-      const container = document.createElement('div');
-      container.id = id;
-      container.className = 'select-ai-translation-container';
-      container.style.cssText = `
-        display: none;
-        opacity: 0;
-        transition: opacity 0.3s ease;
-        margin-top: 0.5em;
-        margin-bottom: 0.5em;
-        ${inheritedStyles}
-      `;
-
-      container.innerHTML = `
-        <div class="translation-loading" style="display: inline-flex; align-items: center; gap: 8px; ${inheritedStyles}">
-          <span style="width: 16px; height: 16px; border: 2px solid currentColor; border-top-color: transparent; border-radius: 50%; animation: spin 1s linear infinite;"></span>
-          <span>${t.translateLoading[lang]}</span>
-        </div>
-        <div class="translation-content" style="display: none; ${inheritedStyles}"></div>
-      `;
-
-      if (element.parentElement) {
-        element.parentElement.insertBefore(container, element.nextSibling);
+      let originalHTML: string | undefined;
+      if (hasNested) {
+        originalHTML = getDirectTextContent(element);
+      } else {
+        const hasSpanChild = element.querySelector('span');
+        if (hasSpanChild) {
+          originalHTML = getDirectTextContent(element);
+        }
       }
 
-      // Mark element as translated to avoid duplicate translation
-      element.setAttribute('data-select-ai-translated', 'true');
+      if (!text) continue;
+
+      items.push({ element, id, text, originalHTML });
+    }
+
+    if (abortRef.current) {
+      setIsTranslating(false);
+      clearAllTranslations();
+      return;
     }
 
     const style = document.createElement('style');
@@ -434,9 +529,21 @@ const InlineTranslator: React.FC<InlineTranslatorProps> = ({ blacklist }) => {
         from { transform: rotate(0deg); }
         to { transform: rotate(360deg); }
       }
-      .select-ai-translation-container.show {
+      .select-ai-translation-container.block-mode.show {
         display: block !important;
         opacity: 1 !important;
+        width: 100%;
+      }
+      .select-ai-translation-container.inline-mode.show {
+        display: inline !important;
+        opacity: 0.9 !important;
+        vertical-align: baseline !important;
+      }
+      .select-ai-translation-container.inline-mode {
+        vertical-align: baseline;
+      }
+      .select-ai-translation-container.block-mode {
+        vertical-align: top;
       }
     `;
     if (!document.head.querySelector('#select-ai-translation-style')) {
@@ -446,46 +553,103 @@ const InlineTranslator: React.FC<InlineTranslatorProps> = ({ blacklist }) => {
 
     if (!chrome.runtime?.id) {
       setIsTranslating(false);
-      for (const id of elementIds) {
-        const container = document.getElementById(id);
-        if (container) {
-          container.innerHTML = `<span style="color: #dc2626;">${t.extUpdated[lang]}</span>`;
-          container.classList.add('show');
-        }
-      }
       return;
     }
 
-    const MAX_CONCURRENT = 10;
-    // Dynamic batch interval - reduce delay to improve parallel efficiency
-    const batchDelay = 100;
+    const allPromises: Promise<void>[] = [];
 
-    // Process each batch in parallel
-    for (let i = 0; i < elementsToTranslate.length; i += MAX_CONCURRENT) {
-      const batch = elementsToTranslate.slice(i, i + MAX_CONCURRENT);
-      const batchIds = elementIds.slice(i, i + MAX_CONCURRENT);
+    for (const item of items) {
+      if (abortRef.current) break;
 
-      // Launch all translation requests in parallel
-      const promises = batch.map((element, index) => translateElement(element, batchIds[index]));
-      await Promise.all(promises);
+      const element = item.element;
+      const id = item.id;
+      const text = item.text;
+      const tagName = element.tagName.toLowerCase();
 
-      // Short delay between batches to avoid too many requests
-      if (i + MAX_CONCURRENT < elementsToTranslate.length) {
-        await new Promise(resolve => setTimeout(resolve, batchDelay));
+      const useInlineMode = shouldUseInlineMode(element, text);
+      const computedStyle = window.getComputedStyle(element);
+
+      const inheritedStyles = `
+        color: ${computedStyle.color};
+        background-color: transparent;
+        font-family: ${computedStyle.fontFamily};
+        font-size: 0.9em;
+        font-weight: ${computedStyle.fontWeight};
+        line-height: ${computedStyle.lineHeight};
+        text-align: ${computedStyle.textAlign};
+        opacity: 1;
+      `;
+
+      const container = document.createElement('span');
+      container.id = id;
+      container.className = `select-ai-translation-container ${useInlineMode ? 'inline-mode' : 'block-mode'}`;
+
+      if (useInlineMode) {
+        container.style.cssText = `
+          display: none;
+          opacity: 0;
+          transition: opacity 0.3s ease;
+          margin-left: 6px;
+          ${inheritedStyles}
+        `;
+
+        container.innerHTML = `
+          <span class="translation-loading" style="display: inline-flex; align-items: center; gap: 4px; ${inheritedStyles}">
+            <span style="width: 10px; height: 10px; border: 1.5px solid currentColor; border-top-color: transparent; border-radius: 50%; animation: spin 1s linear infinite;"></span>
+          </span>
+          <span class="translation-content" style="display: none; ${inheritedStyles}"></span>
+        `;
+
+        element.appendChild(container);
+      } else {
+        container.style.cssText = `
+          display: none;
+          opacity: 0;
+          transition: opacity 0.3s ease;
+          margin-top: 0.4em;
+          margin-bottom: 0.4em;
+          width: 100%;
+          ${inheritedStyles}
+        `;
+
+        container.innerHTML = `
+          <div class="translation-loading" style="display: inline-flex; align-items: center; gap: 8px; ${inheritedStyles}">
+            <span style="width: 14px; height: 14px; border: 2px solid currentColor; border-top-color: transparent; border-radius: 50%; animation: spin 1s linear infinite;"></span>
+            <span style="font-size: 0.9em;">${t.translateLoading[lang]}</span>
+          </div>
+          <div class="translation-content" style="display: none; ${inheritedStyles}"></div>
+        `;
+
+        const isListItem = tagName === 'li' || tagName === 'dt' || tagName === 'dd';
+        if (isListItem) {
+          element.appendChild(container);
+        } else if (element.parentElement) {
+          element.parentElement.insertBefore(container, element.nextSibling);
+        }
       }
+
+      if (item.originalHTML) {
+        container.setAttribute('data-original-html', item.originalHTML);
+      }
+
+      element.setAttribute('data-select-ai-translated', 'true');
+      element.setAttribute('data-select-ai-inline-mode', useInlineMode ? 'true' : 'false');
+
+      allPromises.push(translateElement(element, id, text, item.originalHTML));
     }
 
-    setIsTranslating(false);
-  }, [lang, t, translateElement, setIsTranslated, showAllTranslations, blacklist]);
+    Promise.allSettled(allPromises).then(() => {
+      setIsTranslating(false);
+    });
 
-  // Cleanup function
+  }, [lang, t, translateElement, setIsTranslated, showAllTranslations, blacklist, getDirectTextContent, hasNestedList, targetLang, updateTranslation, shouldUseInlineMode, clearAllTranslations, abortRef]);
+
   useEffect(() => {
     return () => {
       disconnectStreamPort();
     };
   }, []);
 
-  // Fullscreen detection
   const [isFullscreen, setIsFullscreen] = useState(false);
 
   useEffect(() => {
@@ -506,7 +670,6 @@ const InlineTranslator: React.FC<InlineTranslatorProps> = ({ blacklist }) => {
         }
       `}</style>
 
-      {/* Inline translation button - floating at bottom-right, draggable */}
       <div
         ref={buttonRef}
         style={{
@@ -518,7 +681,7 @@ const InlineTranslator: React.FC<InlineTranslatorProps> = ({ blacklist }) => {
           borderRadius: '50%',
           background: isTranslating ? '#9ca3af' : 'linear-gradient(135deg, #ec4899 0%, #8b5cf6 100%)',
           boxShadow: isTranslating ? '0 2px 8px rgba(156, 163, 175, 0.4)' : '0 2px 8px rgba(139, 92, 246, 0.5)',
-          cursor: isDragging ? 'grabbing' : (isTranslating ? 'not-allowed' : 'grab'),
+          cursor: isDragging ? 'grabbing' : 'pointer',
           zIndex: 2147483646,
           display: isFullscreen ? 'none' : 'flex',
           alignItems: 'center',
@@ -531,13 +694,18 @@ const InlineTranslator: React.FC<InlineTranslatorProps> = ({ blacklist }) => {
         }}
         onMouseDown={isTranslating ? undefined : handleDragStart}
         onClick={() => {
-          if (isTranslating || isDragging || wasDraggingRef.current) {
+          if (isDragging || wasDraggingRef.current) {
             wasDraggingRef.current = false;
             return;
           }
 
+          if (isTranslating) {
+            abortRef.current = true;
+            setIsTranslating(false);
+            return;
+          }
+
           if (isTranslated && translatedIdsRef.current.size > 0) {
-            // Only hide translation containers, keep cache for restore on next click
             hideAllTranslations();
             setIsTranslated(false);
           } else {
@@ -545,12 +713,10 @@ const InlineTranslator: React.FC<InlineTranslatorProps> = ({ blacklist }) => {
             const selectedText = sel?.toString().trim();
 
             if (selectedText && selectedText.length > 0) {
-              // Has selected text: clear old cache, re-translate
               clearAllTranslations();
               handleInlineTranslate();
               setIsTranslated(true);
             } else {
-              // No selected text: restore from cache or perform translation
               if (translationCache.current.size > 0) {
                 showAllTranslations();
                 setIsTranslated(true);

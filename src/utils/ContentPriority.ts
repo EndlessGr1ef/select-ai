@@ -313,4 +313,37 @@ export class ContentPriority {
 
     return 'other';
   }
+  /**
+   * Sort elements by visibility priority
+   * Visible elements (top to bottom) -> Elements below viewport -> Elements above viewport
+   */
+  static sortByVisibility(elements: Element[]): Element[] {
+    const viewportHeight = window.innerHeight;
+
+    return [...elements].sort((a, b) => {
+      const rectA = a.getBoundingClientRect();
+      const rectB = b.getBoundingClientRect();
+
+      const getScore = (rect: DOMRect) => {
+        // 1. Visible area (higher score for top elements)
+        if (rect.top < viewportHeight && rect.bottom > 0) {
+          // Score range: 100000 - 90000 (roughly)
+          // Use rect.top to sort top-to-bottom
+          return 100000 - rect.top;
+        }
+
+        // 2. Below viewport (higher score for elements closer to viewport)
+        if (rect.top >= viewportHeight) {
+          // Score range: 50000 - ...
+          return 50000 - rect.top;
+        }
+
+        // 3. Above viewport (lowest priority)
+        // Score range: negative values
+        return rect.bottom;
+      };
+
+      return getScore(rectB) - getScore(rectA);
+    });
+  }
 }

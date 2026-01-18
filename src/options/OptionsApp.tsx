@@ -438,7 +438,7 @@ const OptionsApp: React.FC = () => {
                 }
               }}
             >
-              <span>✨</span> {t.tabApiConfig[lang]}
+              <span>⚙️</span> {t.tabApiConfig[lang]}
             </button>
             <button
               style={getTabStyle(activeTab === 'translation')}
@@ -463,192 +463,192 @@ const OptionsApp: React.FC = () => {
           {/* API Config Tab */}
           {activeTab === 'api' && (
             <React.Fragment>
-            <div style={sectionStyle}>
-            <div style={sectionTitleStyle}>
-              <span>🔑</span> {t.apiSection[lang]}
-            </div>
+              <div style={sectionStyle}>
+                <div style={sectionTitleStyle}>
+                  <span>🔑</span> {t.apiSection[lang]}
+                </div>
 
-            {/* Provider Selection */}
-            <div style={{ marginBottom: 20 }}>
-              <label style={labelStyle}>{t.providerLabel[lang]}</label>
-              <select
-                value={provider}
-                onChange={(e) => {
-                  const newProvider = e.target.value as Provider;
-                  setProvider(newProvider);
-                  // Config will be loaded by useEffect
-                }}
-                style={selectStyle}
-                onFocus={(e) => {
-                  e.target.style.borderColor = '#3b82f6';
-                  e.target.style.boxShadow = '0 0 0 3px rgba(59,130,246,0.1)';
-                }}
-                onBlur={(e) => {
-                  e.target.style.borderColor = '#e5e7eb';
-                  e.target.style.boxShadow = 'none';
-                }}
-              >
-                <option value="openai">{t.openaiName[lang]}</option>
-                <option value="anthropic">{t.anthropicName[lang]}</option>
-                <option value="minimax">{t.minimaxName[lang]}</option>
-                <option value="deepseek">{t.deepseekName[lang]}</option>
-                <option value="glm">{t.glmName[lang]}</option>
-              </select>
-            </div>
-
-            <div style={{ marginBottom: 20 }}>
-              <label style={labelStyle}>{t.apiKeyLabel[lang]}</label>
-              <div style={inputWrapperStyle}>
-                <input
-                  type={showApiKey ? 'text' : 'password'}
-                  value={apiKey}
-                  onChange={(e) => setApiKey(e.target.value)}
-                  placeholder={t.apiKeyPlaceholder[lang]}
-                  style={{
-                    ...inputStyle,
-                    paddingRight: 44,
-                  }}
-                  onFocus={(e) => {
-                    e.target.style.borderColor = '#3b82f6';
-                    e.target.style.boxShadow = '0 0 0 3px rgba(59,130,246,0.1)';
-                  }}
-                  onBlur={(e) => {
-                    e.target.style.borderColor = '#e5e7eb';
-                    e.target.style.boxShadow = 'none';
-                  }}
-                />
-                <button
-                  type="button"
-                  style={eyeButtonStyle}
-                  onClick={() => setShowApiKey(!showApiKey)}
-                  onMouseOver={(e) => e.currentTarget.style.color = '#6b7280'}
-                  onMouseOut={(e) => e.currentTarget.style.color = '#9ca3af'}
-                  title={showApiKey ? t.hideApiKey[lang] : t.showApiKey[lang]}
-                >
-                  {showApiKey ? (
-                    // Eye off icon
-                    <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
-                      <path d="M17.94 17.94A10.07 10.07 0 0 1 12 20c-7 0-11-8-11-8a18.45 18.45 0 0 1 5.06-5.94M9.9 4.24A9.12 9.12 0 0 1 12 4c7 0 11 8 11 8a18.5 18.5 0 0 1-2.16 3.19m-6.72-1.07a3 3 0 1 1-4.24-4.24"></path>
-                      <line x1="1" y1="1" x2="23" y2="23"></line>
-                    </svg>
-                  ) : (
-                    // Eye icon
-                    <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
-                      <path d="M1 12s4-8 11-8 11 8 11 8-4 8-11 8-11-8-11-8z"></path>
-                      <circle cx="12" cy="12" r="3"></circle>
-                    </svg>
-                  )}
-                </button>
-              </div>
-            </div>
-
-            <div>
-              <label style={labelStyle}>{t.baseUrlLabel[lang]}</label>
-              <input
-                type="text"
-                value={baseUrl}
-                onChange={(e) => setBaseUrl(e.target.value)}
-                style={inputStyle}
-                onFocus={(e) => {
-                  e.target.style.borderColor = '#3b82f6';
-                  e.target.style.boxShadow = '0 0 0 3px rgba(59,130,246,0.1)';
-                }}
-                onBlur={(e) => {
-                  e.target.style.borderColor = '#e5e7eb';
-                  e.target.style.boxShadow = 'none';
-                }}
-              />
-              <p style={hintStyle}>
-                {t.baseUrlHint[lang]}: {PROVIDER_CONFIGS[provider].defaultBaseUrl}
-              </p>
-              <p style={hintStyle}>{t.baseUrlCustomHint[lang]}</p>
-            </div>
-          </div>
-
-          {/* Model Section */}
-          <div style={sectionStyle}>
-            <div style={sectionTitleStyle}>
-              <span>🤖</span> {t.modelSection[lang]}
-            </div>
-
-            <div style={rowStyle}>
-              <div>
-                <label style={labelStyle}>{t.modelLabel[lang]}</label>
-                <div style={modelInputWrapperStyle}>
-                  <input
-                    type="text"
-                    value={model}
-                    onChange={(e) => setModel(e.target.value)}
-                    style={inputStyle}
+                {/* Provider Selection */}
+                <div style={{ marginBottom: 20 }}>
+                  <label style={labelStyle}>{t.providerLabel[lang]}</label>
+                  <select
+                    value={provider}
+                    onChange={(e) => {
+                      const newProvider = e.target.value as Provider;
+                      setProvider(newProvider);
+                      // Config will be loaded by useEffect
+                    }}
+                    style={selectStyle}
                     onFocus={(e) => {
-                      if (modelBlurTimeoutRef.current) {
-                        window.clearTimeout(modelBlurTimeoutRef.current);
-                        modelBlurTimeoutRef.current = null;
-                      }
-                      setShowModelOptions(true);
                       e.target.style.borderColor = '#3b82f6';
                       e.target.style.boxShadow = '0 0 0 3px rgba(59,130,246,0.1)';
                     }}
                     onBlur={(e) => {
                       e.target.style.borderColor = '#e5e7eb';
                       e.target.style.boxShadow = 'none';
-                      modelBlurTimeoutRef.current = window.setTimeout(() => {
-                        setShowModelOptions(false);
-                      }, 120);
+                    }}
+                  >
+                    <option value="openai">{t.openaiName[lang]}</option>
+                    <option value="anthropic">{t.anthropicName[lang]}</option>
+                    <option value="minimax">{t.minimaxName[lang]}</option>
+                    <option value="deepseek">{t.deepseekName[lang]}</option>
+                    <option value="glm">{t.glmName[lang]}</option>
+                  </select>
+                </div>
+
+                <div style={{ marginBottom: 20 }}>
+                  <label style={labelStyle}>{t.apiKeyLabel[lang]}</label>
+                  <div style={inputWrapperStyle}>
+                    <input
+                      type={showApiKey ? 'text' : 'password'}
+                      value={apiKey}
+                      onChange={(e) => setApiKey(e.target.value)}
+                      placeholder={t.apiKeyPlaceholder[lang]}
+                      style={{
+                        ...inputStyle,
+                        paddingRight: 44,
+                      }}
+                      onFocus={(e) => {
+                        e.target.style.borderColor = '#3b82f6';
+                        e.target.style.boxShadow = '0 0 0 3px rgba(59,130,246,0.1)';
+                      }}
+                      onBlur={(e) => {
+                        e.target.style.borderColor = '#e5e7eb';
+                        e.target.style.boxShadow = 'none';
+                      }}
+                    />
+                    <button
+                      type="button"
+                      style={eyeButtonStyle}
+                      onClick={() => setShowApiKey(!showApiKey)}
+                      onMouseOver={(e) => e.currentTarget.style.color = '#6b7280'}
+                      onMouseOut={(e) => e.currentTarget.style.color = '#9ca3af'}
+                      title={showApiKey ? t.hideApiKey[lang] : t.showApiKey[lang]}
+                    >
+                      {showApiKey ? (
+                        // Eye off icon
+                        <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+                          <path d="M17.94 17.94A10.07 10.07 0 0 1 12 20c-7 0-11-8-11-8a18.45 18.45 0 0 1 5.06-5.94M9.9 4.24A9.12 9.12 0 0 1 12 4c7 0 11 8 11 8a18.5 18.5 0 0 1-2.16 3.19m-6.72-1.07a3 3 0 1 1-4.24-4.24"></path>
+                          <line x1="1" y1="1" x2="23" y2="23"></line>
+                        </svg>
+                      ) : (
+                        // Eye icon
+                        <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+                          <path d="M1 12s4-8 11-8 11 8 11 8-4 8-11 8-11-8-11-8z"></path>
+                          <circle cx="12" cy="12" r="3"></circle>
+                        </svg>
+                      )}
+                    </button>
+                  </div>
+                </div>
+
+                <div>
+                  <label style={labelStyle}>{t.baseUrlLabel[lang]}</label>
+                  <input
+                    type="text"
+                    value={baseUrl}
+                    onChange={(e) => setBaseUrl(e.target.value)}
+                    style={inputStyle}
+                    onFocus={(e) => {
+                      e.target.style.borderColor = '#3b82f6';
+                      e.target.style.boxShadow = '0 0 0 3px rgba(59,130,246,0.1)';
+                    }}
+                    onBlur={(e) => {
+                      e.target.style.borderColor = '#e5e7eb';
+                      e.target.style.boxShadow = 'none';
                     }}
                   />
-                  {showModelOptions && modelOptions.length > 0 && (
-                    <div style={modelOptionsStyle}>
-                      {modelOptions.map((modelOption) => (
-                        <div
-                          key={modelOption}
-                          role="option"
-                          aria-selected={modelOption === model}
-                          style={modelOptionItemStyle}
-                          onMouseDown={(e) => {
-                            e.preventDefault();
-                            setModel(modelOption);
-                            setShowModelOptions(false);
-                          }}
-                          onMouseEnter={(e) => {
-                            e.currentTarget.style.backgroundColor = '#f3f4f6';
-                          }}
-                          onMouseLeave={(e) => {
-                            e.currentTarget.style.backgroundColor = '#fff';
-                          }}
-                        >
-                          {modelOption}
-                        </div>
-                      ))}
-                    </div>
-                  )}
+                  <p style={hintStyle}>
+                    {t.baseUrlHint[lang]}: {PROVIDER_CONFIGS[provider].defaultBaseUrl}
+                  </p>
+                  <p style={hintStyle}>{t.baseUrlCustomHint[lang]}</p>
                 </div>
-                <p style={hintStyle}>{t.modelCustomHint[lang]}</p>
               </div>
 
-              <div>
-                <label style={labelStyle}>{t.targetLangLabel[lang]}</label>
-                <select
-                  value={targetLang}
-                  onChange={(e) => setTargetLang(e.target.value)}
-                  style={selectStyle}
-                  onFocus={(e) => {
-                    e.target.style.borderColor = '#3b82f6';
-                    e.target.style.boxShadow = '0 0 0 3px rgba(59,130,246,0.1)';
-                  }}
-                  onBlur={(e) => {
-                    e.target.style.borderColor = '#e5e7eb';
-                    e.target.style.boxShadow = 'none';
-                  }}
-                >
-                  <option value="中文">🇨🇳 中文</option>
-                  <option value="English">🇺🇸 English</option>
-                  <option value="日本語">🇯🇵 日本語</option>
-                  <option value="한국어">🇰🇷 한국어</option>
-                </select>
+              {/* Model Section */}
+              <div style={sectionStyle}>
+                <div style={sectionTitleStyle}>
+                  <span>🤖</span> {t.modelSection[lang]}
+                </div>
+
+                <div style={rowStyle}>
+                  <div>
+                    <label style={labelStyle}>{t.modelLabel[lang]}</label>
+                    <div style={modelInputWrapperStyle}>
+                      <input
+                        type="text"
+                        value={model}
+                        onChange={(e) => setModel(e.target.value)}
+                        style={inputStyle}
+                        onFocus={(e) => {
+                          if (modelBlurTimeoutRef.current) {
+                            window.clearTimeout(modelBlurTimeoutRef.current);
+                            modelBlurTimeoutRef.current = null;
+                          }
+                          setShowModelOptions(true);
+                          e.target.style.borderColor = '#3b82f6';
+                          e.target.style.boxShadow = '0 0 0 3px rgba(59,130,246,0.1)';
+                        }}
+                        onBlur={(e) => {
+                          e.target.style.borderColor = '#e5e7eb';
+                          e.target.style.boxShadow = 'none';
+                          modelBlurTimeoutRef.current = window.setTimeout(() => {
+                            setShowModelOptions(false);
+                          }, 120);
+                        }}
+                      />
+                      {showModelOptions && modelOptions.length > 0 && (
+                        <div style={modelOptionsStyle}>
+                          {modelOptions.map((modelOption) => (
+                            <div
+                              key={modelOption}
+                              role="option"
+                              aria-selected={modelOption === model}
+                              style={modelOptionItemStyle}
+                              onMouseDown={(e) => {
+                                e.preventDefault();
+                                setModel(modelOption);
+                                setShowModelOptions(false);
+                              }}
+                              onMouseEnter={(e) => {
+                                e.currentTarget.style.backgroundColor = '#f3f4f6';
+                              }}
+                              onMouseLeave={(e) => {
+                                e.currentTarget.style.backgroundColor = '#fff';
+                              }}
+                            >
+                              {modelOption}
+                            </div>
+                          ))}
+                        </div>
+                      )}
+                    </div>
+                    <p style={hintStyle}>{t.modelCustomHint[lang]}</p>
+                  </div>
+
+                  <div>
+                    <label style={labelStyle}>{t.targetLangLabel[lang]}</label>
+                    <select
+                      value={targetLang}
+                      onChange={(e) => setTargetLang(e.target.value)}
+                      style={selectStyle}
+                      onFocus={(e) => {
+                        e.target.style.borderColor = '#3b82f6';
+                        e.target.style.boxShadow = '0 0 0 3px rgba(59,130,246,0.1)';
+                      }}
+                      onBlur={(e) => {
+                        e.target.style.borderColor = '#e5e7eb';
+                        e.target.style.boxShadow = 'none';
+                      }}
+                    >
+                      <option value="中文">🇨🇳 中文</option>
+                      <option value="English">🇺🇸 English</option>
+                      <option value="日本語">🇯🇵 日本語</option>
+                      <option value="한국어">🇰🇷 한국어</option>
+                    </select>
+                  </div>
+                </div>
               </div>
-            </div>
-          </div>
             </React.Fragment>
           )}
 
