@@ -17,6 +17,8 @@ const PRESET_BLACKLIST_SELECTORS = [
   '.BlobViewHeader-module',           // GitHub blob view header
   '.react-blob-header-edit-and-raw-actions', // File actions buttons
   '[data-testid="blob-size"]',        // File size info
+  // GitHub file tree sidebar
+  '[id="repos-file-tree"]',          // GitHub file tree sidebar (by id)
 ];
 
 export class SiteBlacklist {
