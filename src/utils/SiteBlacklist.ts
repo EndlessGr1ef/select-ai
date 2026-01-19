@@ -5,8 +5,9 @@
 
 // System preset blacklist selectors (commonly excluded areas)
 const PRESET_BLACKLIST_SELECTORS = [
-  'header', 'footer', 'nav', 'aside',
-  '.sidebar', '.side-bar',
+  'header', 'footer', 'nav', 'aside','.footer-body',
+  '.sidebar', '.side-bar','.content-navigation','.no-print',
+  '[aria-label="sidebar"]','.code',
   '.menu', '.nav', '.navigation',
   '.header', '.footer', '.topbar', '.toolbar',
   '.advertisement', '.ad', '.ads', '.ad-banner',

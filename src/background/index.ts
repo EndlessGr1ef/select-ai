@@ -74,6 +74,14 @@ const API_CONFIGS: Record<Provider, ProviderApiConfig> = {
   },
 };
 
+chrome.runtime.onInstalled.addListener(() => {
+  chrome.storage.local.get(['selectedProvider'], (result) => {
+    if (!result.selectedProvider) {
+      chrome.storage.local.set({ selectedProvider: 'openai' });
+    }
+  });
+});
+
 function normalizeOpenAIEndpoint(baseUrl: string): string {
   const trimmed = baseUrl.replace(/\/+$/, '');
   if (/\/chat\/completions$/i.test(trimmed)) {
@@ -96,6 +104,11 @@ let cachedProviderConfig: {
   model: string;
   targetLang: string;
 } | null = null;
+
+const DEFAULT_TRANSLATION_CONCURRENCY = 10;
+const MIN_TRANSLATION_CONCURRENCY = 1;
+const MAX_TRANSLATION_CONCURRENCY = 20;
+let cachedTranslationConcurrency: number | null = null;
 
 async function getCachedProviderConfig() {
   if (cachedProviderConfig) return cachedProviderConfig;
@@ -131,13 +144,18 @@ chrome.storage.onChanged.addListener((changes) => {
     'anthropicApiKey', 'anthropicBaseUrl', 'anthropicModel',
     'minimaxApiKey', 'minimaxBaseUrl', 'minimaxModel',
     'deepseekApiKey', 'deepseekBaseUrl', 'deepseekModel',
-    'glmApiKey', 'glmBaseUrl', 'glmModel', 'targetLanguage'];
+    'glmApiKey', 'glmBaseUrl', 'glmModel',
+    'targetLanguage'];
 
   for (const key of relevantKeys) {
     if (changes[key]) {
       cachedProviderConfig = null;
       break;
     }
+  }
+
+  if (changes.translationConcurrency) {
+    cachedTranslationConcurrency = null;
   }
 });
 
@@ -164,7 +182,9 @@ type RequestConfig = {
 type StreamFormat = 'openai' | 'anthropic';
 
 function getStreamFormat(provider: Provider): StreamFormat {
-  return provider === 'openai' || provider === 'deepseek' ? 'openai' : 'anthropic';
+  return provider === 'openai' || provider === 'deepseek'
+    ? 'openai'
+    : 'anthropic';
 }
 
 async function buildRequestConfig(payload: QueryPayload): Promise<RequestConfig> {
@@ -460,9 +480,7 @@ chrome.runtime.onConnect.addListener((port) => {
       });
 
     } else if (message?.action === 'inlineTranslate') {
-      handleInlineTranslate(message.payload as InlineTranslatePayload, port).catch((error) => {
-        port.postMessage({ type: 'error', error: error.message || String(error) });
-      });
+      enqueueInlineTranslate(message.payload as InlineTranslatePayload, port);
     } else if (message?.action === 'inlineTranslateBatch') {
       handleInlineTranslateBatch(message.payload as InlineTranslateBatchPayload, port).catch((error) => {
         port.postMessage({ type: 'error', error: error.message || String(error) });
@@ -482,6 +500,83 @@ type InlineTranslateBatchPayload = {
   targetLang?: string;
   uiLang?: 'zh' | 'en';
 };
+
+type InlineTranslateTask = {
+  payload: InlineTranslatePayload;
+  port: chrome.runtime.Port;
+  started: boolean;
+  canceled: boolean;
+  onDisconnect: () => void;
+};
+
+const inlineTranslateQueue: InlineTranslateTask[] = [];
+let inlineTranslateActiveCount = 0;
+
+function removeInlineTranslateTask(task: InlineTranslateTask) {
+  const index = inlineTranslateQueue.indexOf(task);
+  if (index >= 0) {
+    inlineTranslateQueue.splice(index, 1);
+  }
+}
+
+async function getTranslationConcurrency(): Promise<number> {
+  if (cachedTranslationConcurrency !== null) return cachedTranslationConcurrency;
+
+  const settings = await chrome.storage.local.get(['translationConcurrency']);
+  const rawValue = settings.translationConcurrency as number | undefined;
+  const parsed = Number(rawValue);
+  const value = Number.isFinite(parsed) ? parsed : DEFAULT_TRANSLATION_CONCURRENCY;
+  const clamped = Math.max(MIN_TRANSLATION_CONCURRENCY, Math.min(MAX_TRANSLATION_CONCURRENCY, value));
+  cachedTranslationConcurrency = clamped;
+  return clamped;
+}
+
+async function processInlineTranslateQueue(): Promise<void> {
+  const limit = await getTranslationConcurrency();
+
+  while (inlineTranslateActiveCount < limit && inlineTranslateQueue.length > 0) {
+    const task = inlineTranslateQueue.shift()!;
+    if (task.canceled) continue;
+
+    task.started = true;
+    try {
+      task.port.onDisconnect.removeListener(task.onDisconnect);
+    } catch {
+    }
+
+    inlineTranslateActiveCount += 1;
+    handleInlineTranslate(task.payload, task.port)
+      .catch((error) => {
+        task.port.postMessage({ type: 'error', error: error?.message || String(error) });
+      })
+      .finally(() => {
+        inlineTranslateActiveCount -= 1;
+        processInlineTranslateQueue().catch((error) => {
+          console.warn('[Inline Translate] Queue process error:', error);
+        });
+      });
+  }
+}
+
+function enqueueInlineTranslate(payload: InlineTranslatePayload, port: chrome.runtime.Port) {
+  const task: InlineTranslateTask = {
+    payload,
+    port,
+    started: false,
+    canceled: false,
+    onDisconnect: () => {
+      if (task.started) return;
+      task.canceled = true;
+      removeInlineTranslateTask(task);
+    }
+  };
+
+  port.onDisconnect.addListener(task.onDisconnect);
+  inlineTranslateQueue.push(task);
+  processInlineTranslateQueue().catch((error) => {
+    console.warn('[Inline Translate] Queue process error:', error);
+  });
+}
 
 type InlineTranslateRequestConfig = {
   provider: Provider;
@@ -514,7 +609,8 @@ async function buildInlineTranslateRequestConfig(payload: InlineTranslatePayload
 2. Keep the translation accurate and natural;
 3. Preserve the original meaning and tone;
 4. Use Markdown format for better readability;
-5. Do NOT use code blocks, inline code, or HTML tags;`;
+5. Do NOT use code blocks, inline code, or HTML tags;
+6. Preserve any placeholder tokens like [[[T0]]] exactly and keep them in the same order;`;
 
   const userPrompt = `Translate this text to ${targetLang}:
 

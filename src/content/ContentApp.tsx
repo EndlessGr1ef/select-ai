@@ -6,14 +6,13 @@ import { translations } from '../utils/i18n';
 
 type Provider = 'openai' | 'anthropic' | 'minimax' | 'deepseek' | 'glm';
 
-const ContentApp: React.FC<{ isSelectionBlocked: () => Promise<boolean> }> = ({ isSelectionBlocked }) => {
+const ContentApp: React.FC = () => {
   const [selection, setSelection] = useState<string>('');
   const [position, setPosition] = useState<{ x: number; y: number }>({ x: 0, y: 0 });
   const [showDot, setShowDot] = useState(false);
   const [showPanel, setShowPanel] = useState(false);
   const [result, setResult] = useState<string>('');
   const [loading, setLoading] = useState(false);
-  const [error, setError] = useState<string | null>(null);
   const [modelName, setModelName] = useState('gpt-4o');
   const [lang, setLang] = useState<'zh' | 'en'>('zh');
   const [targetLang, setTargetLang] = useState('中文');
@@ -208,7 +207,7 @@ const ContentApp: React.FC<{ isSelectionBlocked: () => Promise<boolean> }> = ({ 
   }, [isResizing, resizeDirection]);
 
   useEffect(() => {
-    const handleMouseUp = async (e: MouseEvent) => {
+    const handleMouseUp = (e: MouseEvent) => {
       if (isResizing || isDragging) return;
       if (dotRef.current?.contains(e.target as Node) || panelRef.current?.contains(e.target as Node)) {
         return;
@@ -218,25 +217,17 @@ const ContentApp: React.FC<{ isSelectionBlocked: () => Promise<boolean> }> = ({ 
       const text = sel?.toString().trim();
 
       if (text && text.length > 0) {
-        const blocked = await isSelectionBlocked();
-        if (!blocked) {
-          const range = sel?.getRangeAt(0);
-          const rect = range?.getBoundingClientRect();
+        const range = sel?.getRangeAt(0);
+        const rect = range?.getBoundingClientRect();
 
-          if (rect) {
-            setSelection(text);
-            setPosition({
-              x: rect.left + window.scrollX,
-              y: rect.top + window.scrollY
-            });
-            setShowDot(true);
-            setShowPanel(false);
-          }
-        } else {
-          if (!panelRef.current?.contains(e.target as Node)) {
-            setShowDot(false);
-            if (!loading) setShowPanel(false);
-          }
+        if (rect) {
+          setSelection(text);
+          setPosition({
+            x: rect.left + window.scrollX,
+            y: rect.top + window.scrollY
+          });
+          setShowDot(true);
+          setShowPanel(false);
         }
       } else {
         if (!panelRef.current?.contains(e.target as Node)) {
@@ -251,17 +242,9 @@ const ContentApp: React.FC<{ isSelectionBlocked: () => Promise<boolean> }> = ({ 
   }, [loading, isResizing, isDragging]);
 
   const handleTriggerQuery = async () => {
-    // Check if selection is in blacklisted area
-    const blocked = await isSelectionBlocked();
-    if (blocked) {
-      console.log('[Select AI] Selection is in blocked area');
-      return;
-    }
-
     setShowDot(false);
     setShowPanel(true);
     setLoading(true);
-    setError(null);
     setResult('');
     setIsTextExpanded(false);
     setDragOffset({ x: 0, y: 0 });
@@ -274,7 +257,7 @@ const ContentApp: React.FC<{ isSelectionBlocked: () => Promise<boolean> }> = ({ 
 
     if (!chrome.runtime?.id) {
       setLoading(false);
-      setError(t.extUpdated[lang]);
+      console.error('[AI Search] Extension context invalidated');
       return;
     }
 
@@ -293,7 +276,7 @@ const ContentApp: React.FC<{ isSelectionBlocked: () => Promise<boolean> }> = ({ 
           setLoading(false);
         } else if (message?.type === 'error') {
           setLoading(false);
-          setError(message.error || 'Streaming error');
+          console.error('[AI Search] Stream error:', message.error || 'Streaming error');
         }
       });
 
@@ -309,9 +292,9 @@ const ContentApp: React.FC<{ isSelectionBlocked: () => Promise<boolean> }> = ({ 
       setLoading(false);
       const errorStr = String(e);
       if (errorStr.includes('Extension context invalidated')) {
-        setError(t.extUpdated[lang]);
+        console.error('[AI Search] Extension context invalidated');
       } else {
-        setError('Request failed: ' + errorStr);
+        console.error('[AI Search] Request failed:', errorStr);
       }
     }
   };
@@ -460,14 +443,6 @@ const ContentApp: React.FC<{ isSelectionBlocked: () => Promise<boolean> }> = ({ 
     borderTop: '2px solid #3b82f6',
     borderRadius: '50%',
     animation: 'spin 1s linear infinite',
-  };
-
-  const errorStyle: React.CSSProperties = {
-    backgroundColor: '#fef2f2',
-    color: '#dc2626',
-    padding: 12,
-    borderRadius: 8,
-    fontSize: 13,
   };
 
   const footerStyle: React.CSSProperties = {
@@ -672,72 +647,66 @@ const ContentApp: React.FC<{ isSelectionBlocked: () => Promise<boolean> }> = ({ 
             <div style={dividerStyle} />
 
             <div style={{ flex: 1, overflowY: 'auto', minHeight: 0 }}>
-              {error ? (
-                <div style={errorStyle}>
-                  <strong>{t.errorTitle[lang]}</strong> {error}
-                </div>
-              ) : (
-                <>
-                  {loading && !result && (
-                    <div style={loadingStyle}>
-                      <div style={spinnerStyle} />
-                      <span>{t.loading[lang]}</span>
-                    </div>
-                  )}
-                  {(!loading || result) && (
-                    <div style={resultStyle}>
-                      <ReactMarkdown
-                        components={{
-                          p: ({ children }) => <p style={{ margin: '0 0 6px 0', lineHeight: 1.6 }}>{children}</p>,
-                          strong: ({ children }) => <strong style={{ fontWeight: 600, color: '#111827' }}>{children}</strong>,
-                          em: ({ children }) => <em style={{ fontStyle: 'italic' }}>{children}</em>,
-                          ul: ({ children }) => <ul style={{ margin: '4px 0', paddingLeft: 18 }}>{children}</ul>,
-                          ol: ({ children }) => <ol style={{ margin: '4px 0', paddingLeft: 18 }}>{children}</ol>,
-                          li: ({ children }) => <li style={{ marginBottom: 2 }}>{children}</li>,
-                          code: ({ children }) => (
-                            <code style={{
-                              backgroundColor: '#f3f4f6',
-                              padding: '1px 5px',
-                              borderRadius: 3,
-                              fontSize: 13,
-                              fontFamily: 'Monaco, Consolas, monospace'
-                            }}>{children}</code>
-                          ),
-                          pre: ({ children }) => (
-                            <pre style={{
-                              backgroundColor: '#f3f4f6',
-                              padding: 10,
-                              borderRadius: 6,
-                              overflow: 'auto',
-                              fontSize: 13,
-                              margin: '6px 0',
-                              fontFamily: 'Monaco, Consolas, monospace'
-                            }}>{children}</pre>
-                          ),
-                          h1: ({ children }) => <h1 style={{ fontSize: 16, fontWeight: 700, margin: '8px 0 4px' }}>{children}</h1>,
-                          h2: ({ children }) => <h2 style={{ fontSize: 15, fontWeight: 600, margin: '6px 0 3px' }}>{children}</h2>,
-                          h3: ({ children }) => <h3 style={{ fontSize: 14, fontWeight: 600, margin: '4px 0 2px' }}>{children}</h3>,
-                          a: ({ href, children }) => (
-                            <a href={href} target="_blank" rel="noopener noreferrer"
-                               style={{ color: '#3b82f6', textDecoration: 'underline' }}>{children}</a>
-                          ),
-                          blockquote: ({ children }) => (
-                            <blockquote style={{
-                              borderLeft: '3px solid #e5e7eb',
-                              paddingLeft: 10,
-                              margin: '4px 0',
-                              color: '#6b7280'
-                            }}>{children}</blockquote>
-                          ),
-                          br: () => <br style={{ lineHeight: 0.5 }} />,
-                        }}
-                      >
-                        {parseXmlResponse(result, lang)}
-                      </ReactMarkdown>
-                    </div>
-                  )}
-                </>
-              )}
+              <>
+                {loading && !result && (
+                  <div style={loadingStyle}>
+                    <div style={spinnerStyle} />
+                    <span>{t.loading[lang]}</span>
+                  </div>
+                )}
+                {(!loading || result) && (
+                  <div style={resultStyle}>
+                    <ReactMarkdown
+                      components={{
+                        p: ({ children }) => <p style={{ margin: '0 0 6px 0', lineHeight: 1.6 }}>{children}</p>,
+                        strong: ({ children }) => <strong style={{ fontWeight: 600, color: '#111827' }}>{children}</strong>,
+                        em: ({ children }) => <em style={{ fontStyle: 'italic' }}>{children}</em>,
+                        ul: ({ children }) => <ul style={{ margin: '4px 0', paddingLeft: 18 }}>{children}</ul>,
+                        ol: ({ children }) => <ol style={{ margin: '4px 0', paddingLeft: 18 }}>{children}</ol>,
+                        li: ({ children }) => <li style={{ marginBottom: 2 }}>{children}</li>,
+                        code: ({ children }) => (
+                          <code style={{
+                            backgroundColor: '#f3f4f6',
+                            padding: '1px 5px',
+                            borderRadius: 3,
+                            fontSize: 13,
+                            fontFamily: 'Monaco, Consolas, monospace'
+                          }}>{children}</code>
+                        ),
+                        pre: ({ children }) => (
+                          <pre style={{
+                            backgroundColor: '#f3f4f6',
+                            padding: 10,
+                            borderRadius: 6,
+                            overflow: 'auto',
+                            fontSize: 13,
+                            margin: '6px 0',
+                            fontFamily: 'Monaco, Consolas, monospace'
+                          }}>{children}</pre>
+                        ),
+                        h1: ({ children }) => <h1 style={{ fontSize: 16, fontWeight: 700, margin: '8px 0 4px' }}>{children}</h1>,
+                        h2: ({ children }) => <h2 style={{ fontSize: 15, fontWeight: 600, margin: '6px 0 3px' }}>{children}</h2>,
+                        h3: ({ children }) => <h3 style={{ fontSize: 14, fontWeight: 600, margin: '4px 0 2px' }}>{children}</h3>,
+                        a: ({ href, children }) => (
+                          <a href={href} target="_blank" rel="noopener noreferrer"
+                             style={{ color: '#3b82f6', textDecoration: 'underline' }}>{children}</a>
+                        ),
+                        blockquote: ({ children }) => (
+                          <blockquote style={{
+                            borderLeft: '3px solid #e5e7eb',
+                            paddingLeft: 10,
+                            margin: '4px 0',
+                            color: '#6b7280'
+                          }}>{children}</blockquote>
+                        ),
+                        br: () => <br style={{ lineHeight: 0.5 }} />,
+                      }}
+                    >
+                      {parseXmlResponse(result, lang)}
+                    </ReactMarkdown>
+                  </div>
+                )}
+              </>
             </div>
 
             {!loading && result && (

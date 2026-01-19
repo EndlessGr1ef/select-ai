@@ -79,8 +79,8 @@ const OptionsApp: React.FC = () => {
   const [activeTab, setActiveTab] = useState<TabType>('api');
   const [provider, setProvider] = useState<Provider>('openai');
   const [apiKey, setApiKey] = useState('');
-  const [baseUrl, setBaseUrl] = useState(PROVIDER_CONFIGS.minimax.defaultBaseUrl);
-  const [model, setModel] = useState(PROVIDER_CONFIGS.minimax.defaultModel);
+  const [baseUrl, setBaseUrl] = useState(PROVIDER_CONFIGS.openai.defaultBaseUrl);
+  const [model, setModel] = useState(PROVIDER_CONFIGS.openai.defaultModel);
   const [targetLang, setTargetLang] = useState('');
   const [status, setStatus] = useState<{ type: 'success' | 'error' | 'idle', message: string }>({ type: 'idle', message: '' });
   const [lang, setLang] = useState<'zh' | 'en'>('zh');
@@ -91,17 +91,19 @@ const OptionsApp: React.FC = () => {
   // Translation settings
   const [concurrency, setConcurrency] = useState(10);
   const [blacklistEnabled, setBlacklistEnabled] = useState(true);
+  const [translationButtonEnabled, setTranslationButtonEnabled] = useState(true);
 
   // Initialize: load language and selected provider
   useEffect(() => {
     setLang(getUILanguage());
-    chrome.storage.local.get(['selectedProvider', 'targetLanguage', 'translationConcurrency', 'translationBlacklistEnabled'], (result) => {
+    chrome.storage.local.get(['selectedProvider', 'targetLanguage', 'translationConcurrency', 'translationBlacklistEnabled', 'translationButtonEnabled'], (result) => {
       if (result.selectedProvider) {
         setProvider(result.selectedProvider as Provider);
       }
       setTargetLang((result.targetLanguage as string) || getDefaultTargetLanguage());
       setConcurrency((result.translationConcurrency as number) || 10);
       setBlacklistEnabled(result.translationBlacklistEnabled !== false);
+      setTranslationButtonEnabled(result.translationButtonEnabled !== false);
 
       setIsLoading(false);
     });
@@ -134,7 +136,8 @@ const OptionsApp: React.FC = () => {
       [`${providerStorageKey}Model`]: model,
       targetLanguage: targetLang,
       translationConcurrency: concurrency,
-      translationBlacklistEnabled: blacklistEnabled
+      translationBlacklistEnabled: blacklistEnabled,
+      translationButtonEnabled
     }, () => {
       setStatus({ type: 'success', message: t.saveSuccess[lang] });
       setTimeout(() => setStatus({ type: 'idle', message: '' }), 3000);
@@ -454,7 +457,7 @@ const OptionsApp: React.FC = () => {
                 }
               }}
             >
-              <span>✨</span> {t.tabTranslationSettings[lang]}
+              <span>📖</span> {t.tabTranslationSettings[lang]}
             </button>
           </div>
         </div>
@@ -657,6 +660,20 @@ const OptionsApp: React.FC = () => {
             <div style={sectionStyle}>
               <div style={sectionTitleStyle}>
                 <span>🌐</span> {t.translationSettingsTitle[lang]}
+              </div>
+
+              {/* Translation Button Toggle */}
+              <div style={{ marginBottom: 24 }}>
+                <label style={{ ...labelStyle, display: 'flex', alignItems: 'center', gap: 12 }}>
+                  <input
+                    type="checkbox"
+                    checked={translationButtonEnabled}
+                    onChange={(e) => setTranslationButtonEnabled(e.target.checked)}
+                    style={{ width: 20, height: 20, cursor: 'pointer' }}
+                  />
+                  {t.translationButtonToggleLabel[lang]}
+                </label>
+                <p style={{ ...hintStyle, marginLeft: 32 }}>{t.translationButtonToggleHint[lang]}</p>
               </div>
 
               {/* Concurrency Setting */}
