@@ -8,7 +8,6 @@ import { buildPlaceholderTemplate } from './utils/placeholder';
 import {
   getTextSelectors,
   isElementEligible,
-  filterVisibleElements,
   prepareTranslationItems,
 } from './utils/elementDetection';
 import { useTranslationStream } from './hooks/useTranslationStream';
@@ -55,69 +54,121 @@ const InlineTranslatorInner: React.FC<{ blacklist: SiteBlacklist }> = ({ blackli
     };
   }, [disconnect]);
 
-  const getComputedStyles = (element: Element): string => {
+  const getComputedStyles = (element: Element): Record<string, string> => {
     const computedStyle = window.getComputedStyle(element);
-    return `
-      color: ${computedStyle.color};
-      background-color: transparent;
-      font-family: ${computedStyle.fontFamily};
-      font-size: 0.9em;
-      font-weight: ${computedStyle.fontWeight};
-      line-height: ${computedStyle.lineHeight};
-      text-align: ${computedStyle.textAlign};
-      opacity: 1;
-    `;
+
+    return {
+      color: computedStyle.color,
+      backgroundColor: 'transparent',
+      fontFamily: computedStyle.fontFamily,
+      fontSize: '0.9em',
+      fontWeight: computedStyle.fontWeight,
+      lineHeight: computedStyle.lineHeight,
+      textAlign: computedStyle.textAlign,
+      opacity: '1',
+    };
   };
 
   const createTranslationContainer = (
     element: Element,
     id: string,
     useInlineMode: boolean,
-    inheritedStyles: string
+    inheritedStyles: Record<string, string>
   ): void => {
     const container = document.createElement('span');
     container.id = id;
     container.className = `select-ai-translation-container ${useInlineMode ? 'inline-mode' : 'block-mode'}`;
 
+    // 应用通用样式
+    Object.assign(container.style, inheritedStyles);
+
     if (useInlineMode) {
-      container.style.cssText = `
-        display: none;
-        opacity: 0;
-        transition: opacity 0.3s ease;
-        margin-left: 6px;
-        ${inheritedStyles}
-      `;
+      container.style.display = 'none';
+      container.style.opacity = '0';
+      container.style.transition = 'opacity 0.3s ease';
+      container.style.marginLeft = '6px';
+      container.style.whiteSpace = 'normal';
+      container.style.overflowWrap = 'break-word';
+      container.style.maxWidth = '100%';
 
-      container.innerHTML = `
-        <span class="translation-loading" style="display: inline-flex; align-items: center; gap: 4px; ${inheritedStyles}">
-          <span style="width: 10px; height: 10px; border: 1.5px solid currentColor; border-top-color: transparent; border-radius: 50%; animation: spin 1s linear infinite;"></span>
-        </span>
-        <span class="translation-content" style="display: none; ${inheritedStyles}"></span>
-      `;
+      const loadingSpan = document.createElement('span');
+      loadingSpan.className = 'translation-loading';
+      loadingSpan.style.display = 'inline-flex';
+      loadingSpan.style.alignItems = 'center';
+      loadingSpan.style.gap = '4px';
+      Object.assign(loadingSpan.style, inheritedStyles);
 
-      element.appendChild(container);
+      const spinner = document.createElement('span');
+      spinner.style.width = '10px';
+      spinner.style.height = '10px';
+      spinner.style.border = '1.5px solid currentColor';
+      spinner.style.borderTopColor = 'transparent';
+      spinner.style.borderRadius = '50%';
+      spinner.style.animation = 'spin 1s linear infinite';
+      loadingSpan.appendChild(spinner);
+
+      const contentSpan = document.createElement('span');
+      contentSpan.className = 'translation-content';
+      contentSpan.style.display = 'none';
+      contentSpan.style.whiteSpace = 'normal';
+      contentSpan.style.overflowWrap = 'break-word';
+      Object.assign(contentSpan.style, inheritedStyles);
+
+      container.appendChild(loadingSpan);
+      container.appendChild(contentSpan);
+
+      // 对于 <a> 标签，翻译容器应该插入到外部而不是内部，避免破坏链接结构
+      const tagName = element.tagName.toLowerCase();
+      if (tagName === 'a' && element.parentElement) {
+        element.parentElement.insertBefore(container, element.nextSibling);
+      } else {
+        element.appendChild(container);
+      }
     } else {
-      container.style.cssText = `
-        display: none;
-        opacity: 0;
-        transition: opacity 0.3s ease;
-        margin-top: 0.4em;
-        margin-bottom: 0.4em;
-        width: 100%;
-        ${inheritedStyles}
-      `;
+      container.style.display = 'none';
+      container.style.opacity = '0';
+      container.style.transition = 'opacity 0.3s ease';
+      container.style.marginTop = '0.4em';
+      container.style.marginBottom = '0.4em';
+      container.style.width = '100%';
+      Object.assign(container.style, inheritedStyles);
 
-      container.innerHTML = `
-        <div class="translation-loading" style="display: inline-flex; align-items: center; gap: 8px; ${inheritedStyles}">
-          <span style="width: 14px; height: 14px; border: 2px solid currentColor; border-top-color: transparent; border-radius: 50%; animation: spin 1s linear infinite;"></span>
-          <span style="font-size: 0.9em;">${t.translateLoading[uiLang]}</span>
-        </div>
-        <div class="translation-content" style="display: none; ${inheritedStyles}"></div>
-      `;
+      const loadingDiv = document.createElement('div');
+      loadingDiv.className = 'translation-loading';
+      loadingDiv.style.display = 'inline-flex';
+      loadingDiv.style.alignItems = 'center';
+      loadingDiv.style.gap = '8px';
+      Object.assign(loadingDiv.style, inheritedStyles);
+
+      const spinner = document.createElement('span');
+      spinner.style.width = '14px';
+      spinner.style.height = '14px';
+      spinner.style.border = '2px solid currentColor';
+      spinner.style.borderTopColor = 'transparent';
+      spinner.style.borderRadius = '50%';
+      spinner.style.animation = 'spin 1s linear infinite';
+      loadingDiv.appendChild(spinner);
+
+      const loadingText = document.createElement('span');
+      loadingText.style.fontSize = '0.9em';
+      loadingText.textContent = t.translateLoading[uiLang];
+      loadingDiv.appendChild(loadingText);
+
+      const contentDiv = document.createElement('div');
+      contentDiv.className = 'translation-content';
+      contentDiv.style.display = 'none';
+      Object.assign(contentDiv.style, inheritedStyles);
+
+      container.appendChild(loadingDiv);
+      container.appendChild(contentDiv);
 
       const tagName = element.tagName.toLowerCase();
       const isListItem = tagName === 'li' || tagName === 'dt' || tagName === 'dd';
+      const isTableCell = tagName === 'td' || tagName === 'th';
       if (isListItem) {
+        element.appendChild(container);
+      } else if (isTableCell) {
+        // 表格单元格：将翻译容器作为子元素
         element.appendChild(container);
       } else if (element.parentElement) {
         element.parentElement.insertBefore(container, element.nextSibling);
@@ -236,8 +287,7 @@ const InlineTranslatorInner: React.FC<{ blacklist: SiteBlacklist }> = ({ blackli
         }
 
         const allElements = inRangeElements.filter(isElementEligibleWithBlacklist);
-        const filteredElements = filterVisibleElements(allElements);
-        elementsToTranslate = ContentPriority.sortByVisibility(filteredElements);
+        elementsToTranslate = ContentPriority.sortByVisibility(allElements);
       }
 
       if (elementsToTranslate.length === 0) {
@@ -252,8 +302,7 @@ const InlineTranslatorInner: React.FC<{ blacklist: SiteBlacklist }> = ({ blackli
     } else {
       const allElements = Array.from(document.querySelectorAll(textSelectors))
         .filter(isElementEligibleWithBlacklist);
-      const filteredElements = filterVisibleElements(allElements);
-      elementsToTranslate = ContentPriority.sortByVisibility(filteredElements);
+      elementsToTranslate = ContentPriority.sortByVisibility(allElements);
     }
 
     if (elementsToTranslate.length === 0) {
@@ -278,6 +327,8 @@ const InlineTranslatorInner: React.FC<{ blacklist: SiteBlacklist }> = ({ blackli
         display: inline !important;
         opacity: 0.9 !important;
         vertical-align: baseline !important;
+        white-space: normal !important;
+        word-wrap: break-word !important;
       }
       .select-ai-translation-container.inline-mode {
         vertical-align: baseline;

@@ -6,17 +6,15 @@
 
 [![MIT License](https://img.shields.io/badge/License-MIT-green.svg)](LICENSE)
 [![Chrome Extension](https://img.shields.io/badge/Chrome-Extension-blue.svg)]()
-[![中文](https://img.shields.io/badge/中文-文档-green)](README.md)
 
 </div>
-
 <div align="center">
 
 ![Demo](demo_en.gif)
 
 </div>
 
-## ✨ Features
+## ✨ Core Features
 
 | Feature | Description | Use Case |
 |---------|-------------|----------|
@@ -27,35 +25,10 @@
 | 🔌 **Multi-API Support** | MiniMax / OpenAI / Anthropic / DeepSeek / Zhipu AI / Custom API | Flexible deployment, self-hosted services |
 | 💬 **Markdown Rendering** | AI responses displayed in beautiful Markdown format | Clear, readable output |
 | 🔒 **Privacy First** | API keys stored locally, no user data collection | Secure usage |
-
-## 🌐 Global Translation
-
-Floating button at bottom-right for full-page or selected text translation.
-
-### Key Features
-
-| Feature | Description |
-|---------|-------------|
-| 🎯 **Floating Button** | Draggable, click to translate |
-| 📄 **Full Page** | Auto-detect content, batch translate paragraphs |
-| ✂️ **Selected Text** | Translate only selected text |
-| 💾 **Smart Cache** | Toggle display without re-requesting |
-| 🚀 **Concurrent** | Parallel translation for speed |
-| 🌍 **Language Detection** | Skip text matching target language |
-
-### Usage
-
-- **Full Page**: Ensure no text selected, click button
-- **Selected**: Select text, then click button
-- **Show/Hide**: Click button to toggle translations
-- **Drag**: Hold and drag to any position
-
-### Configuration
-
-Configure in "Translation Settings" tab:
-- **Target Language**: Chinese/English
-- **Concurrency**: Parallel paragraph count (default 10)
-- **Blacklist**: Enable/disable site blacklist
+| 📄 **Full Page Translation** | Auto-detect content, batch translate entire page | Foreign language websites |
+| ✂️ **Selected Text** | Translate only selected text or paragraphs | Precise translation needs |
+| 🔄 **Smart Cache** | Toggle display without re-requesting | Repeated viewing |
+| ⚡ **Concurrent Translation** | Multi-paragraph parallel translation | Batch translation |
 
 ## 📖 Why Select AI?
 
@@ -106,6 +79,9 @@ pnpm build
 
 # Type checking
 pnpm type-check
+
+# Linting
+pnpm lint
 ```
 
 ## 💻 Usage
@@ -145,26 +121,68 @@ This extension is compatible with any Anthropic-format API:
 ```
 select-ai/
 ├── src/
-│   ├── main.tsx              # Popup entry point
-│   ├── App.tsx               # Popup UI
+│   ├── main.tsx                    # Popup entry point
+│   ├── App.tsx                     # Popup UI
 │   ├── background/
-│   │   └── index.ts          # Service Worker (API request handling)
+│   │   └── index.ts                # Service Worker (API requests, streaming)
 │   ├── content/
-│   │   ├── index.tsx         # Content script entry
-│   │   ├── ContentApp.tsx    # Selection floating UI
-│   │   └── content.css       # Content script styles
+│   │   ├── index.tsx               # Content script entry
+│   │   ├── ContentApp.tsx          # Main controller (selection detection & translation coordination)
+│   │   ├── content.css             # Content script styles
+│   │   ├── InlineTranslator.tsx    # Full-page/selection translator
+│   │   ├── context/
+│   │   │   └── TranslationContext.tsx  # Translation state management
+│   │   ├── components/
+│   │   │   ├── FloatingButton/     # Floating button (drag, click)
+│   │   │   │   ├── index.ts
+│   │   │   │   ├── FloatingButton.tsx
+│   │   │   │   ├── useDraggable.ts
+│   │   │   │   └── types.ts
+│   │   │   ├── TranslationPanel/   # Translation result panel
+│   │   │   │   ├── index.ts
+│   │   │   │   ├── TranslationPanel.tsx
+│   │   │   │   ├── BlockPanel.tsx
+│   │   │   │   └── InlinePanel.tsx
+│   │   │   └── TranslationContent/ # Translation content rendering
+│   │   │       ├── index.ts
+│   │   │       └── TranslationContent.tsx
+│   │   ├── hooks/
+│   │   │   ├── useTranslationStream.ts   # Streaming translation hook
+│   │   │   └── useAbortController.ts     # Request abort control
+│   │   └── utils/
+│   │       ├── elementDetection.ts  # Main content element detection
+│   │       ├── markdown.ts          # Markdown rendering
+│   │       └── placeholder.ts       # Placeholder management
 │   ├── options/
-│   │   ├── index.tsx         # Settings page entry
-│   │   └── OptionsApp.tsx    # Settings page UI
-│   └── utils/
-│       ├── ContextExtractor.ts  # Context extraction algorithm
-│       ├── i18n.ts              # Multi-language strings
-│       └── language.ts          # Language detection
+│   │   ├── index.tsx               # Options entry
+│   │   └── OptionsApp.tsx          # Settings page UI
+│   ├── utils/
+│   │   ├── ContextExtractor.ts     # Context extraction (500-3000 chars)
+│   │   ├── language.ts             # Language detection
+│   │   ├── i18n.ts                 # Multi-language strings
+│   │   ├── SiteBlacklist.ts        # Site blacklist
+│   │   └── ContentPriority.ts      # Content priority algorithm
+│   ├── assets/
+│   │   └── react.svg
+│   ├── App.css
+│   └── index.css
 ├── public/
-│   └── icon.svg              # Extension icon
-├── manifest.json             # Extension configuration
-├── vite.config.ts            # Vite build configuration
-└── package.json              # Dependencies
+│   ├── icon.svg
+│   ├── icon-16.png
+│   ├── icon-48.png
+│   ├── icon-128.png
+│   └── icon.png
+├── scripts/
+│   └── convert-icon.cjs            # Icon conversion script
+├── index.html                      # Popup HTML
+├── options.html                    # Options HTML
+├── manifest.json                   # Extension configuration
+├── vite.config.ts                  # Vite build configuration
+├── postcss.config.js               # PostCSS configuration
+├── eslint.config.js                # ESLint configuration
+├── tsconfig.json                   # TypeScript configuration
+├── package.json                    # Dependencies
+└── README.md                       # This document
 ```
 
 ## 🤝 Contributing

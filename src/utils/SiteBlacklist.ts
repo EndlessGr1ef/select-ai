@@ -7,12 +7,16 @@
 const PRESET_BLACKLIST_SELECTORS = [
   'header', 'footer', 'nav', 'aside','.footer-body',
   '.sidebar', '.side-bar','.content-navigation','.no-print',
-  '[aria-label="sidebar"]','.code',
+  '[aria-label="sidebar"]','.code', 'code',
   '.menu', '.nav', '.navigation',
   '.header', '.footer', '.topbar', '.toolbar',
   '.advertisement', '.ad', '.ads', '.ad-banner',
   '.sponsor', '.promo',
   '.breadcrumb', '.pagination', '.widget',
+  // GitHub file page header
+  '.BlobViewHeader-module',           // GitHub blob view header
+  '.react-blob-header-edit-and-raw-actions', // File actions buttons
+  '[data-testid="blob-size"]',        // File size info
 ];
 
 export class SiteBlacklist {

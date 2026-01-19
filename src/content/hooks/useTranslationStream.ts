@@ -35,6 +35,7 @@ export const useTranslationStream = () => {
     let connected = false;
     let resolved = false;
     let fullTranslation = '';
+    let currentAttempt = 0;
 
     const cleanup = () => {
       if (port) {
@@ -49,9 +50,16 @@ export const useTranslationStream = () => {
     const disconnectHandler = () => {
       streamPortRef.current = null;
       cleanup();
+      // Only handle disconnect if this is the current attempt and not resolved
       if (!resolved) {
         resolved = true;
-        onDone(fullTranslation);
+        // Only call onDone if this was a successful connection that got interrupted
+        // If we haven't successfully connected yet (connected === false), treat as error
+        if (connected) {
+          onDone(fullTranslation);
+        } else {
+          onError('Connection failed');
+        }
       }
     };
 
@@ -84,6 +92,9 @@ export const useTranslationStream = () => {
 
     const tryConnect = (attempt: number): Promise<void> => {
       return new Promise((resolve) => {
+        // Use currentAttempt to track the latest attempt number
+        currentAttempt = attempt;
+
         if (resolved || attempt > 3) {
           if (!resolved) {
             resolved = true;
@@ -98,6 +109,15 @@ export const useTranslationStream = () => {
             throw new Error('Extension context invalidated');
           }
 
+          // Disconnect any existing port before creating a new one
+          if (port) {
+            try {
+              port.disconnect();
+            } catch {
+            }
+            port = null;
+          }
+
           port = chrome.runtime.connect({ name: 'ai-translate-stream' });
 
           if (!port) {
@@ -107,20 +127,25 @@ export const useTranslationStream = () => {
           connected = true;
           streamPortRef.current = port;
 
+          // Only add listeners for the current attempt
           port.onMessage.addListener(messageHandler);
           port.onDisconnect.addListener(disconnectHandler);
 
           setTimeout(() => {
-            if (!connected || !port || resolved) {
+            // Check if this is still the current attempt and conditions are met
+            if (!connected || !port || resolved || currentAttempt !== attempt) {
               return;
             }
             try {
               port.postMessage({ action: 'inlineTranslate', payload });
+              resolve();
             } catch {
               cleanup();
               setTimeout(() => {
-                if (!resolved) {
+                if (!resolved && currentAttempt === attempt) {
                   tryConnect(attempt + 1).then(resolve);
+                } else {
+                  resolve();
                 }
               }, 50 * Math.pow(2, Math.min(attempt, 5)) + Math.random() * 50);
             }
@@ -128,8 +153,10 @@ export const useTranslationStream = () => {
         } catch {
           cleanup();
           setTimeout(() => {
-            if (!resolved) {
+            if (!resolved && currentAttempt === attempt) {
               tryConnect(attempt + 1).then(resolve);
+            } else {
+              resolve();
             }
           }, 50 * Math.pow(2, Math.min(attempt, 5)) + Math.random() * 50);
         }
