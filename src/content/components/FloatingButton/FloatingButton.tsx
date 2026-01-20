@@ -1,14 +1,14 @@
 import React from 'react';
 import type { FloatingButtonProps } from './types';
 
-const FloatingButton: React.FC<FloatingButtonProps> = ({ 
-  ref, 
-  isTranslating, 
-  isDragging, 
-  position, 
-  onDragStart, 
-  onClick, 
-  onMouseOver, 
+const FloatingButton: React.FC<FloatingButtonProps> = ({
+  ref,
+  isTranslating,
+  isDragging,
+  position,
+  onDragStart,
+  onClick,
+  onMouseOver,
   onMouseOut,
   uiLang,
   isFullscreen,
@@ -53,26 +53,25 @@ const FloatingButton: React.FC<FloatingButtonProps> = ({
       title={uiLang === 'zh' ? '翻译' : 'Translate'}
     >
       {isTranslating ? (
-        <div
-          style={{
-            width: 10,
-            height: 10,
-            border: '2px solid rgba(255, 255, 255, 0.6)',
-            borderTopColor: 'transparent',
-            borderRadius: '50%',
-            animation: 'spin 1s linear infinite',
-          }}
-        />
+        <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
+          <div
+            className="select-ai-loading-spinner"
+            style={{
+              width: 14,
+              height: 14,
+              border: '2px solid rgba(255, 255, 255, 0.9)',
+              borderTopColor: 'transparent',
+              borderRadius: '50%',
+              animation: 'select-ai-spin 0.8s linear infinite',
+            }}
+          />
+        </div>
       ) : (
         <span style={{
           animation: isDragging ? 'none' : 'pulse 2s ease-in-out infinite',
         }}>{buttonText}</span>
       )}
       <style>{`
-        @keyframes spin {
-          from { transform: rotate(0deg); }
-          to { transform: rotate(360deg); }
-        }
         @keyframes pulse {
           0%, 100% { opacity: 1; }
           50% { opacity: 0.7; }

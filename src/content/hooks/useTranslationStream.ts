@@ -90,8 +90,8 @@ export const useTranslationStream = () => {
       }
     };
 
-    const tryConnect = (attempt: number): Promise<void> => {
-      return new Promise((resolve) => {
+    return new Promise((resolve) => {
+      const tryConnectWithResolve = (attempt: number) => {
         // Use currentAttempt to track the latest attempt number
         currentAttempt = attempt;
 
@@ -127,9 +127,63 @@ export const useTranslationStream = () => {
           connected = true;
           streamPortRef.current = port;
 
-          // Only add listeners for the current attempt
-          port.onMessage.addListener(messageHandler);
-          port.onDisconnect.addListener(disconnectHandler);
+          // Define local handlers that capture resolve
+          const localMessageHandler = (message: StreamMessage) => {
+            if (message.type === 'delta') {
+              fullTranslation += message.data || '';
+              onDelta(fullTranslation);
+            } else if (message.type === 'done') {
+              if (!resolved) {
+                resolved = true;
+                onDone(fullTranslation);
+                cleanup();
+                try {
+                  port?.disconnect();
+                } catch {
+                }
+                resolve();
+              }
+            } else if (message.type === 'error') {
+              if (!resolved) {
+                resolved = true;
+                cleanup();
+                onError(message.error || 'Translation error');
+                try {
+                  port?.disconnect();
+                } catch {
+                }
+                resolve();
+              }
+            }
+          };
+
+          const localDisconnectHandler = () => {
+            streamPortRef.current = null;
+            cleanup();
+            if (!resolved) {
+              resolved = true;
+              if (connected) {
+                onDone(fullTranslation);
+              } else {
+                onError('Connection failed');
+              }
+              resolve();
+            }
+          };
+
+          // Override cleanup to use local listeners
+          const localCleanup = () => {
+            if (port) {
+              try {
+                port.onMessage.removeListener(localMessageHandler);
+                port.onDisconnect.removeListener(localDisconnectHandler);
+              } catch {
+              }
+            }
+          };
+
+          port.onMessage.addListener(localMessageHandler);
+          port.onDisconnect.addListener(localDisconnectHandler);
 
           setTimeout(() => {
             // Check if this is still the current attempt and conditions are met
@@ -138,12 +192,12 @@ export const useTranslationStream = () => {
             }
             try {
               port.postMessage({ action: 'inlineTranslate', payload });
-              resolve();
+              // We DO NOT resolve here anymore. We wait for localMessageHandler or localDisconnectHandler.
             } catch {
-              cleanup();
+              localCleanup();
               setTimeout(() => {
                 if (!resolved && currentAttempt === attempt) {
-                  tryConnect(attempt + 1).then(resolve);
+                  tryConnectWithResolve(attempt + 1);
                 } else {
                   resolve();
                 }
@@ -154,16 +208,16 @@ export const useTranslationStream = () => {
           cleanup();
           setTimeout(() => {
             if (!resolved && currentAttempt === attempt) {
-              tryConnect(attempt + 1).then(resolve);
+              tryConnectWithResolve(attempt + 1);
             } else {
               resolve();
             }
           }, 50 * Math.pow(2, Math.min(attempt, 5)) + Math.random() * 50);
         }
-      });
-    };
+      };
 
-    return tryConnect(0);
+      tryConnectWithResolve(0);
+    });
   }, []);
 
   return { translate, disconnect, streamPortRef };

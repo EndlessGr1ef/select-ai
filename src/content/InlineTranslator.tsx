@@ -343,12 +343,9 @@ const InlineTranslatorInner: React.FC<{ blacklist: SiteBlacklist }> = ({ blackli
     if (elementsToTranslate.length === 0) {
       return;
     }
-
-    setIsTranslating(true);
-
     const style = document.createElement('style');
     style.textContent = `
-      @keyframes spin {
+      @keyframes select-ai-spin {
         from { transform: rotate(0deg); }
         to { transform: rotate(360deg); }
       }
@@ -428,7 +425,6 @@ const InlineTranslatorInner: React.FC<{ blacklist: SiteBlacklist }> = ({ blackli
       setIsTranslating(false);
       return;
     }
-
     if (isTranslated && translatedIds.size > 0) {
       clearAllTranslations();
       setIsTranslated(false);
@@ -438,6 +434,7 @@ const InlineTranslatorInner: React.FC<{ blacklist: SiteBlacklist }> = ({ blackli
 
       if (selectedText && selectedText.length > 0) {
         clearAllTranslations();
+        setIsTranslating(true);
         handleInlineTranslate();
         setIsTranslated(true);
       } else {
@@ -451,12 +448,13 @@ const InlineTranslatorInner: React.FC<{ blacklist: SiteBlacklist }> = ({ blackli
           });
           setIsTranslated(true);
         } else {
+          setIsTranslating(true);
           handleInlineTranslate();
           setIsTranslated(true);
         }
       }
     }
-  }, [isDragging, isTranslating, isTranslated, translatedIds, translationCache, abortRef, clearAllTranslations, handleInlineTranslate]);
+  }, [isDragging, isTranslating, isTranslated, translatedIds, translationCache, abortRef, clearAllTranslations, handleInlineTranslate, setIsTranslating, setIsTranslated]);
 
   const handleMouseOver = (e: React.MouseEvent) => {
     if (!isTranslating && !isDragging) {
@@ -477,9 +475,12 @@ const InlineTranslatorInner: React.FC<{ blacklist: SiteBlacklist }> = ({ blackli
   return (
     <>
       <style>{`
-        @keyframes spin {
+        @keyframes select-ai-spin {
           from { transform: rotate(0deg); }
           to { transform: rotate(360deg); }
+        }
+        .select-ai-loading-spinner {
+          animation: select-ai-spin 0.8s linear infinite !important;
         }
       `}</style>
 
