@@ -52,24 +52,30 @@ export const buildPlaceholderTemplate = (originalHTML: string): PlaceholderTempl
 
 export const parsePlaceholderSegments = (translatedText: string) => {
   const regex = /\[\[\[T(\d+)\]\]\]/g;
-  const matches = Array.from(translatedText.matchAll(regex));
+  // Use split with capturing group to get [prefix, index0, content0, index1, content1, ...]
+  const parts = translatedText.split(regex);
   const segments = new Map<number, { text: string; start: number; end: number }>();
+  const matchedIndices: number[] = [];
 
-  for (let i = 0; i < matches.length; i += 1) {
-    const match = matches[i];
-    const tokenIndex = Number(match[1]);
-    const matchStart = match.index ?? 0;
-    const segmentStart = matchStart + match[0].length;
-    const nextMatch = matches[i + 1];
-    const segmentEnd = nextMatch?.index ?? translatedText.length;
+  // parts structure:
+  // [0]: text before first token
+  // [1]: first token index
+  // [2]: text after first token and before second token
+  // ... and so on
+  for (let i = 1; i < parts.length; i += 2) {
+    const tokenIndex = Number(parts[i]);
+    const translatedPart = parts[i + 1] || '';
+
     segments.set(tokenIndex, {
-      text: translatedText.slice(segmentStart, segmentEnd),
-      start: segmentStart,
-      end: segmentEnd
+      text: translatedPart,
+      // Note: start and end are approximations here as we don't have exact char indices from split
+      // but they are primarily used for sorting in applyPlaceholderTranslation
+      start: i,
+      end: i + 1
     });
+    matchedIndices.push(tokenIndex);
   }
 
-  const matchedIndices = matches.map(match => Number(match[1]));
   return { segments, matchedIndices };
 };
 
