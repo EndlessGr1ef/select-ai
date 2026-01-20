@@ -10,4 +10,5 @@ export interface FloatingButtonProps {
   onMouseOut: (e: React.MouseEvent) => void;
   uiLang: 'zh' | 'en';
   isFullscreen: boolean;
+  ref: React.RefObject<HTMLDivElement | null>;
 }

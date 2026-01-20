@@ -3,6 +3,7 @@ import { useTranslation } from '../../context/TranslationContext';
 import { parseMarkdown } from '../../utils/markdown';
 import { applyPlaceholderTranslation } from '../../utils/placeholder';
 import type { PlaceholderTemplate } from '../../utils/placeholder';
+import { Sparkles } from 'lucide-react';
 
 interface InlinePanelProps {
   id: string;
@@ -72,18 +73,29 @@ const InlinePanel: React.FC<InlinePanelProps> = ({
       className="select-ai-translation-container inline-mode"
       style={containerStyle}
     >
+      <style>{`
+        .select-ai-translation-container.show {
+          opacity: 1 !important;
+        }
+        @keyframes sparkle-pulse {
+          0%, 100% { opacity: 0.6; transform: scale(0.9); }
+          50% { opacity: 1; transform: scale(1.1); }
+        }
+      `}</style>
       <div
         className="translation-loading"
-        style={{ display: 'inline-flex', alignItems: 'center', gap: 4 }}
+        style={{
+          display: 'inline-flex',
+          alignItems: 'center',
+          gap: 6,
+          color: 'inherit',
+        }}
       >
-        <span
+        <Sparkles
+          size={12}
           style={{
-            width: 10,
-            height: 10,
-            border: '1.5px solid currentColor',
-            borderTopColor: 'transparent',
-            borderRadius: '50%',
-            animation: 'spin 1s linear infinite',
+            animation: 'sparkle-pulse 1.5s ease-in-out infinite',
+            opacity: 0.7,
           }}
         />
       </div>

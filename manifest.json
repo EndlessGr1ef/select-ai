@@ -4,9 +4,9 @@
   "version": "0.3.1",
   "description": "AI-powered selection search with context awareness",
   "icons": {
-    "16": "icon-16.png",
-    "48": "icon-48.png",
-    "128": "icon-128.png"
+    "16": "app-icon.png",
+    "48": "app-icon.png",
+    "128": "app-icon.png"
   },
   "permissions": [
     "storage",
@@ -15,9 +15,9 @@
   "action": {
     "default_popup": "index.html",
     "default_icon": {
-      "16": "icon-16.png",
-      "48": "icon-48.png",
-      "128": "icon-128.png"
+      "16": "app-icon.png",
+      "48": "app-icon.png",
+      "128": "app-icon.png"
     }
   },
   "options_page": "options.html",

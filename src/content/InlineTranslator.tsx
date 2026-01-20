@@ -37,7 +37,7 @@ const InlineTranslatorInner: React.FC<{ blacklist: SiteBlacklist }> = ({ blackli
   const { translate, disconnect } = useTranslationStream();
 
   const [isFullscreen, setIsFullscreen] = useState(false);
-  const { isDragging, position, wasDraggingRef, handleDragStart } = useDraggable();
+  const { isDragging, position, wasDraggingRef, handleDragStart, buttonRef } = useDraggable();
 
   const t = translations.content;
 
@@ -484,6 +484,7 @@ const InlineTranslatorInner: React.FC<{ blacklist: SiteBlacklist }> = ({ blackli
       `}</style>
 
       <FloatingButton
+        ref={buttonRef}
         isTranslating={isTranslating}
         isDragging={isDragging}
         position={position}

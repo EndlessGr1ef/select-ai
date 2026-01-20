@@ -74,21 +74,40 @@ const BlockPanel: React.FC<BlockPanelProps> = ({
       className="select-ai-translation-container block-mode"
       style={containerStyle}
     >
+      <style>{`
+        .select-ai-translation-container.show {
+          opacity: 1 !important;
+        }
+        @keyframes sparkle-pulse {
+          0%, 100% { opacity: 0.6; transform: scale(0.9); }
+          50% { opacity: 1; transform: scale(1.1); }
+        }
+        @keyframes spin-smooth {
+          from { transform: rotate(0deg); }
+          to { transform: rotate(360deg); }
+        }
+      `}</style>
       <div
         className="translation-loading"
-        style={{ display: 'inline-flex', alignItems: 'center', gap: 8 }}
+        style={{
+          display: 'inline-flex',
+          alignItems: 'center',
+          gap: 10,
+          color: 'inherit',
+        }}
       >
-        <span
+        <div
           style={{
-            width: 14,
-            height: 14,
+            width: 16,
+            height: 16,
             border: '2px solid currentColor',
             borderTopColor: 'transparent',
             borderRadius: '50%',
-            animation: 'spin 1s linear infinite',
+            animation: 'spin-smooth 1s linear infinite',
+            opacity: 0.6,
           }}
         />
-        <span style={{ fontSize: '0.9em' }}>{loadingText}</span>
+        <span style={{ fontSize: '0.9em', opacity: 0.8 }}>{loadingText}</span>
       </div>
       <div className="translation-content" style={{ display: 'none' }} />
     </span>

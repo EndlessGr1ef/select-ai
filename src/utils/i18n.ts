@@ -56,9 +56,9 @@ export const translations = {
     blacklistCancel: { zh: '取消', en: 'Cancel' },
     // Tab headers
     tabApiConfig: { zh: 'API 配置', en: 'API Config' },
-    tabTranslationSettings: { zh: '原位翻译', en: 'In-place Translation' },
+    tabTranslationSettings: { zh: '双语字幕翻译', en: 'Bilingual Subtitle Translation' },
     // Translation settings section
-    translationSettingsTitle: { zh: '原位翻译设置', en: 'In-place Translation Settings' },
+    translationSettingsTitle: { zh: '双语字幕翻译设置', en: 'Bilingual Subtitle Translation Settings' },
     translationButtonToggleLabel: { zh: '显示翻译按钮', en: 'Show translation button' },
     translationButtonToggleHint: { zh: '控制页面悬浮翻译按钮是否显示', en: 'Control visibility of the floating translation button' },
     // Guide steps for translation tab
