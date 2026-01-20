@@ -28,7 +28,7 @@
 | 📄 **Full Page Translation** | Auto-detect content, batch translate entire page | Foreign language websites |
 | ✂️ **Selected Text** | Translate only selected text or paragraphs | Precise translation needs |
 | 🔄 **Smart Cache** | Toggle display without re-requesting | Repeated viewing |
-| ⚡ **Concurrent Translation** | Multi-paragraph parallel translation | Batch translation |
+| ⚡ **Concurrent Translation** | Multi-paragraph parallel translation with loading states | Batch translation |
 
 ## 📖 Why Select AI?
 

@@ -1,7 +1,7 @@
 {
   "manifest_version": 3,
   "name": "Select AI（AI划词解释）",
-  "version": "0.3.1",
+  "version": "0.3.2",
   "description": "AI-powered selection search with context awareness",
   "icons": {
     "16": "app-icon.png",
