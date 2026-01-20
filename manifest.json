@@ -1,20 +1,23 @@
 {
   "manifest_version": 3,
   "name": "Select AI（AI划词解释）",
-  "version": "1.0.0",
+  "version": "0.3.2",
   "description": "AI-powered selection search with context awareness",
   "icons": {
-    "16": "icon-16.png",
-    "48": "icon-48.png",
-    "128": "icon-128.png"
+    "16": "app-icon.png",
+    "48": "app-icon.png",
+    "128": "app-icon.png"
   },
-  "permissions": ["storage", "activeTab"],
+  "permissions": [
+    "storage",
+    "activeTab"
+  ],
   "action": {
     "default_popup": "index.html",
     "default_icon": {
-      "16": "icon-16.png",
-      "48": "icon-48.png",
-      "128": "icon-128.png"
+      "16": "app-icon.png",
+      "48": "app-icon.png",
+      "128": "app-icon.png"
     }
   },
   "options_page": "options.html",
@@ -24,9 +27,15 @@
   },
   "content_scripts": [
     {
-      "matches": ["<all_urls>"],
-      "js": ["src/content/index.tsx"]
+      "matches": [
+        "<all_urls>"
+      ],
+      "js": [
+        "src/content/index.tsx"
+      ]
     }
   ],
-  "host_permissions": ["<all_urls>"]
+  "host_permissions": [
+    "<all_urls>"
+  ]
 }

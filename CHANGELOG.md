@@ -1,5 +1,26 @@
 # Changelog / 更新日志
 
+## [0.3.2] - 2026-01-20
+
+### Fixed / 修复
+- Fixed translation button loading effect and animation / 修复翻译按钮 Loading 加载效果与动画
+- Corrected streaming translation Promise lifecycle / 修正流式翻译 Promise 生命周期
+- Resolved CSS animation naming conflicts / 解决 CSS 动画命名冲突
+- Fixed state synchronization issues in translation / 修复翻译状态同步问题
+
+### Changed / 改进
+- Improved floating button visibility and UI responsiveness / 提升悬浮按钮可见性与 UI 响应速度
+- Optimized bilingual translation display logic / 优化双语翻译显示逻辑
+
+---
+
+## [0.3.1] - 2026-01-19
+
+### Changed / 改进
+- Internal code optimizations and version preparation / 内部代码优化与版本准备
+
+---
+
 ## [0.3.0] - 2026-01-17
 
 ### Added / 新增

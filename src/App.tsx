@@ -2,8 +2,13 @@ import { useState, useEffect } from 'react'
 import './App.css'
 import { getUILanguage } from './utils/language'
 import { translations } from './utils/i18n'
+import {
+  Settings,
+  CheckCircle2,
+  AlertCircle
+} from 'lucide-react'
+import { icons } from './resource'
 
-// Provider configurations
 type Provider = 'openai' | 'anthropic' | 'minimax' | 'deepseek' | 'glm';
 
 interface ProviderConfig {
@@ -46,7 +51,6 @@ function App() {
   const [modelName, setModelName] = useState('');
   const [lang, setLang] = useState<'zh' | 'en'>('zh');
 
-  // Provider display names
   const providerNames: Record<Provider, { zh: string; en: string }> = {
     openai: { zh: 'OpenAI', en: 'OpenAI' },
     anthropic: { zh: 'Anthropic', en: 'Anthropic' },
@@ -60,14 +64,12 @@ function App() {
   }, []);
 
   useEffect(() => {
-    // Check if chrome API is available (running in extension context)
     if (typeof chrome !== 'undefined' && chrome.storage) {
       chrome.storage.local.get(['selectedProvider'], async (result) => {
-        const selectedProvider = (result.selectedProvider as Provider) || 'openai';
+        const selectedProvider = (result.selectedProvider as Provider) || 'deepseek';
         const config = PROVIDER_CONFIGS[selectedProvider];
         const storageKey = config.storageKey;
 
-        // Get the provider-specific API key
         const settings = await chrome.storage.local.get([
           `${storageKey}ApiKey`,
           `${storageKey}Model`
@@ -90,136 +92,133 @@ function App() {
     if (typeof chrome !== 'undefined' && chrome.runtime?.openOptionsPage) {
       chrome.runtime.openOptionsPage();
     } else {
-      // Fallback for non-extension context
       window.open('options.html', '_blank');
     }
   };
 
-  // Styles matching OptionsApp
   const containerStyle: React.CSSProperties = {
-    width: 320,
-    background: 'linear-gradient(135deg, #667eea 0%, #764ba2 100%)',
+    width: 340,
+    background: 'linear-gradient(180deg, #f8fafc 0%, #e2e8f0 100%)',
     fontFamily: '-apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif',
   };
 
   const cardStyle: React.CSSProperties = {
     backgroundColor: '#fff',
-    borderRadius: 0,
+    borderRadius: 16,
+    boxShadow: '0 4px 24px rgba(0,0,0,0.08)',
+    overflow: 'hidden',
   };
 
   const headerStyle: React.CSSProperties = {
-    background: 'linear-gradient(135deg, #1e3a5f 0%, #2d5a87 100%)',
-    padding: '20px 20px 16px',
+    background: 'linear-gradient(135deg, #1e1b4b 0%, #312e81 100%)',
+    padding: '24px 24px 20px',
     color: '#fff',
   };
 
   const logoStyle: React.CSSProperties = {
     display: 'flex',
     alignItems: 'center',
-    gap: 12,
+    gap: 14,
   };
 
   const iconStyle: React.CSSProperties = {
-    width: 44,
-    height: 44,
-    background: 'linear-gradient(135deg, #ec4899 0%, #8b5cf6 100%)',
-    borderRadius: 12,
+    width: 48,
+    height: 48,
     display: 'flex',
     alignItems: 'center',
     justifyContent: 'center',
-    fontSize: 20,
-    boxShadow: '0 4px 12px rgba(236,72,153,0.3)',
   };
 
   const titleStyle: React.CSSProperties = {
-    fontSize: 18,
+    fontSize: 20,
     fontWeight: 700,
     margin: 0,
+    letterSpacing: '-0.5px',
   };
 
   const subtitleStyle: React.CSSProperties = {
-    fontSize: 12,
-    opacity: 0.8,
+    fontSize: 13,
+    opacity: 0.85,
     marginTop: 2,
+    fontWeight: 400,
   };
 
   const contentStyle: React.CSSProperties = {
-    padding: 20,
+    padding: '24px 24px 20px',
   };
 
   const statusCardStyle: React.CSSProperties = {
     background: isConfigured
-      ? 'linear-gradient(135deg, #dcfce7 0%, #bbf7d0 100%)'
-      : 'linear-gradient(135deg, #fef3c7 0%, #fde68a 100%)',
-    borderRadius: 12,
-    padding: 16,
-    marginBottom: 16,
-    border: isConfigured ? '1px solid #86efac' : '1px solid #fcd34d',
+      ? 'linear-gradient(135deg, #ecfdf5 0%, #d1fae5 100%)'
+      : 'linear-gradient(135deg, #fffbeb 0%, #fef3c7 100%)',
+    borderRadius: 14,
+    padding: '18px 18px 16px',
+    marginBottom: 20,
+    border: isConfigured ? '1px solid #a7f3d0' : '1px solid #fcd34d',
   };
 
   const statusIconStyle: React.CSSProperties = {
-    width: 32,
-    height: 32,
-    borderRadius: 8,
+    width: 36,
+    height: 36,
+    borderRadius: 10,
     display: 'flex',
     alignItems: 'center',
     justifyContent: 'center',
-    fontSize: 16,
-    backgroundColor: isConfigured ? '#22c55e' : '#f59e0b',
+    marginBottom: 10,
+    backgroundColor: isConfigured ? '#10b981' : '#f59e0b',
     color: '#fff',
-    marginBottom: 8,
   };
 
   const statusTitleStyle: React.CSSProperties = {
-    fontSize: 14,
+    fontSize: 15,
     fontWeight: 600,
-    color: isConfigured ? '#166534' : '#92400e',
+    color: isConfigured ? '#065f46' : '#92400e',
     marginBottom: 4,
   };
 
   const statusTextStyle: React.CSSProperties = {
-    fontSize: 12,
-    color: isConfigured ? '#15803d' : '#a16207',
+    fontSize: 13,
+    color: isConfigured ? '#047857' : '#a16207',
   };
 
   const infoCardStyle: React.CSSProperties = {
-    backgroundColor: '#f0f9ff',
-    borderRadius: 12,
-    padding: 16,
-    marginBottom: 16,
-    border: '1px solid #bae6fd',
+    backgroundColor: '#f8fafc',
+    borderRadius: 14,
+    padding: '18px',
+    marginBottom: 20,
+    border: '1px solid #e2e8f0',
   };
 
   const infoTitleStyle: React.CSSProperties = {
     fontSize: 13,
     fontWeight: 600,
-    color: '#0369a1',
-    marginBottom: 10,
+    color: '#334155',
+    marginBottom: 12,
     display: 'flex',
     alignItems: 'center',
-    gap: 6,
+    gap: 8,
   };
 
   const infoListStyle: React.CSSProperties = {
     margin: 0,
-    paddingLeft: 18,
+    paddingLeft: 20,
     fontSize: 12,
-    color: '#0c4a6e',
-    lineHeight: 1.7,
+    color: '#475569',
+    lineHeight: 1.75,
   };
 
   const buttonStyle: React.CSSProperties = {
     width: '100%',
-    padding: '12px 16px',
-    fontSize: 14,
+    padding: '14px 20px',
+    fontSize: 15,
     fontWeight: 600,
     color: '#fff',
-    background: 'linear-gradient(135deg, #3b82f6 0%, #8b5cf6 100%)',
+    background: 'linear-gradient(135deg, #8b5cf6 0%, #6366f1 100%)',
     border: 'none',
-    borderRadius: 10,
+    borderRadius: 12,
     cursor: 'pointer',
-    transition: 'transform 0.15s, box-shadow 0.15s',
-    boxShadow: '0 4px 12px rgba(59,130,246,0.35)',
+    transition: 'all 0.2s ease',
+    boxShadow: '0 4px 14px rgba(99, 102, 241, 0.35)',
     display: 'flex',
     alignItems: 'center',
     justifyContent: 'center',
@@ -227,27 +226,43 @@ function App() {
   };
 
   const footerStyle: React.CSSProperties = {
-    borderTop: '1px solid #e5e7eb',
-    padding: '12px 20px',
-    backgroundColor: '#f9fafb',
+    borderTop: '1px solid #e2e8f0',
+    padding: '14px 24px',
+    backgroundColor: '#f8fafc',
     display: 'flex',
     alignItems: 'center',
     justifyContent: 'center',
-    gap: 6,
+    gap: 8,
   };
 
   const versionStyle: React.CSSProperties = {
     fontSize: 11,
-    color: '#9ca3af',
+    color: '#94a3b8',
+    fontWeight: 500,
   };
 
   return (
     <div style={containerStyle}>
+      <style>{`
+        @keyframes pulse-gentle {
+          0%, 100% { transform: scale(1); }
+          50% { transform: scale(1.05); }
+        }
+      `}</style>
       <div style={cardStyle}>
-        {/* Header */}
         <div style={headerStyle}>
           <div style={logoStyle}>
-            <div style={iconStyle}>✨</div>
+            <div style={iconStyle}>
+              <img
+                src={icons.main}
+                alt="Select AI"
+                style={{
+                  width: 48,
+                  height: 48,
+                  objectFit: 'contain'
+                }}
+              />
+            </div>
             <div>
               <h1 style={titleStyle}>{t.title[lang]}</h1>
               <p style={subtitleStyle}>{t.subtitle[lang]}</p>
@@ -255,12 +270,14 @@ function App() {
           </div>
         </div>
 
-        {/* Content */}
         <div style={contentStyle}>
-          {/* Status Card */}
           <div style={statusCardStyle}>
             <div style={statusIconStyle}>
-              {isConfigured ? '✓' : '!'}
+              {isConfigured ? (
+                <CheckCircle2 size={20} strokeWidth={2.5} />
+              ) : (
+                <AlertCircle size={20} strokeWidth={2.5} />
+              )}
             </div>
             <div style={statusTitleStyle}>
               {isConfigured ? t.statusReady[lang] : t.statusNeedConfig[lang]}
@@ -272,10 +289,10 @@ function App() {
             </div>
           </div>
 
-          {/* Usage Guide */}
           <div style={infoCardStyle}>
             <div style={infoTitleStyle}>
-              <span>📖</span> {t.usageTitle[lang]}
+
+              {t.usageTitle[lang]}
             </div>
             <ol style={infoListStyle}>
               {(t.usageSteps as Record<string, string[]>)[lang].map((step, i) => (
@@ -284,24 +301,23 @@ function App() {
             </ol>
           </div>
 
-          {/* Settings Button */}
           <button
             style={buttonStyle}
             onClick={openOptions}
             onMouseOver={(e) => {
-              e.currentTarget.style.transform = 'translateY(-1px)';
-              e.currentTarget.style.boxShadow = '0 6px 16px rgba(59,130,246,0.45)';
+              e.currentTarget.style.transform = 'translateY(-2px)';
+              e.currentTarget.style.boxShadow = '0 6px 20px rgba(99, 102, 241, 0.45)';
             }}
             onMouseOut={(e) => {
               e.currentTarget.style.transform = 'translateY(0)';
-              e.currentTarget.style.boxShadow = '0 4px 12px rgba(59,130,246,0.35)';
+              e.currentTarget.style.boxShadow = '0 4px 14px rgba(99, 102, 241, 0.35)';
             }}
           >
-            <span>⚙️</span> {t.settingsBtn[lang]}
+            <Settings size={18} strokeWidth={2} />
+            {t.settingsBtn[lang]}
           </button>
         </div>
 
-        {/* Footer */}
         <div style={footerStyle}>
           <span style={versionStyle}>{t.version[lang]}</span>
         </div>

@@ -1,3 +1,5 @@
+import { getAppVersion } from './version'
+
 export const translations = {
   popup: {
     title: { zh: 'AI 划词搜索', en: 'Select AI' },
@@ -12,7 +14,7 @@ export const translations = {
       en: ['Select any text on the webpage', 'Click the pink-purple dot', 'AI will analyze and explain or translate'],
     },
     settingsBtn: { zh: '设置选项', en: 'Settings' },
-    version: { zh: '🚀 v1.0.0', en: '🚀 v1.0.0' },
+    version: { zh: `🚀 v${getAppVersion()}`, en: `🚀 v${getAppVersion()}` },
   },
   options: {
     title: { zh: 'AI 划词搜索', en: 'Select AI' },
@@ -54,9 +56,11 @@ export const translations = {
     blacklistCancel: { zh: '取消', en: 'Cancel' },
     // Tab headers
     tabApiConfig: { zh: 'API 配置', en: 'API Config' },
-    tabTranslationSettings: { zh: '全局翻译', en: 'Global Translation' },
+    tabTranslationSettings: { zh: '双语字幕翻译', en: 'Bilingual Subtitle Translation' },
     // Translation settings section
-    translationSettingsTitle: { zh: '翻译设置', en: 'Translation Settings' },
+    translationSettingsTitle: { zh: '双语字幕翻译设置', en: 'Bilingual Subtitle Translation Settings' },
+    translationButtonToggleLabel: { zh: '显示翻译按钮', en: 'Show translation button' },
+    translationButtonToggleHint: { zh: '控制页面悬浮翻译按钮是否显示', en: 'Control visibility of the floating translation button' },
     // Guide steps for translation tab
     translationGuideSteps: {
       zh: ['打开任意网页', '点击翻译按钮查看选中部分或全页面翻译'],

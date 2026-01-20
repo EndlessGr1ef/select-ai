@@ -6,23 +6,61 @@ import { translations } from '../utils/i18n';
 
 type Provider = 'openai' | 'anthropic' | 'minimax' | 'deepseek' | 'glm';
 
-const ContentApp: React.FC<{ isSelectionBlocked: () => Promise<boolean> }> = ({ isSelectionBlocked }) => {
+const ContentApp: React.FC = () => {
   const [selection, setSelection] = useState<string>('');
   const [position, setPosition] = useState<{ x: number; y: number }>({ x: 0, y: 0 });
   const [showDot, setShowDot] = useState(false);
   const [showPanel, setShowPanel] = useState(false);
   const [result, setResult] = useState<string>('');
   const [loading, setLoading] = useState(false);
-  const [error, setError] = useState<string | null>(null);
   const [modelName, setModelName] = useState('gpt-4o');
   const [lang, setLang] = useState<'zh' | 'en'>('zh');
   const [targetLang, setTargetLang] = useState('中文');
   const [isTextExpanded, setIsTextExpanded] = useState(false);
 
+  const clampValue = (value: number, min: number, max: number) => Math.min(Math.max(value, min), max);
+
+  const getViewportBounds = () => {
+    const viewport = window.visualViewport;
+    return {
+      width: Math.floor(viewport?.width ?? window.innerWidth),
+      height: Math.floor(viewport?.height ?? window.innerHeight),
+    };
+  };
+
+  const getPanelConstraints = () => {
+    const safeMargin = 12;
+    const { width, height } = getViewportBounds();
+    const usableWidth = Math.max(240, Math.floor(width - safeMargin * 2));
+    const usableHeight = Math.max(220, Math.floor(height - safeMargin * 2));
+    const minWidth = Math.min(320, usableWidth);
+    const minHeight = Math.min(260, usableHeight);
+    const maxWidth = Math.max(minWidth, Math.min(860, Math.floor(width * 0.9)));
+    const maxHeight = Math.max(minHeight, Math.min(760, Math.floor(height * 0.8)));
+    return {
+      minWidth,
+      minHeight,
+      maxWidth,
+      maxHeight,
+      safeMargin,
+      viewportWidth: width,
+      viewportHeight: height,
+    };
+  };
+
+  const getDefaultPanelSize = () => {
+    const { minWidth, minHeight, maxWidth, maxHeight, viewportHeight, viewportWidth } = getPanelConstraints();
+    return {
+      width: Math.round(clampValue(viewportWidth * 0.22, minWidth, maxWidth)),
+      height: Math.round(clampValue(viewportHeight * 0.5, minHeight, maxHeight)),
+    };
+  };
+
   // Resize state for panel
-  const [panelSize, setPanelSize] = useState<{ width: number; height: number }>({ width: 400, height: 450 });
+  const [panelSize, setPanelSize] = useState<{ width: number; height: number }>(() => getDefaultPanelSize());
   const [isResizing, setIsResizing] = useState(false);
   const [resizeDirection, setResizeDirection] = useState<'n' | 's' | 'e' | 'w' | 'ne' | 'nw' | 'se' | 'sw' | null>(null);
+  const [isUserSized, setIsUserSized] = useState(false);
   const resizeStartRef = useRef<{ mouseX: number; mouseY: number; startWidth: number; startHeight: number; startX: number; startY: number } | null>(null);
 
   // Drag state for panel repositioning
@@ -31,14 +69,40 @@ const ContentApp: React.FC<{ isSelectionBlocked: () => Promise<boolean> }> = ({ 
   const dragStartRef = useRef<{ mouseX: number; mouseY: number; offsetX: number; offsetY: number } | null>(null);
 
   const panelRef = useRef<HTMLDivElement>(null);
+  const scrollContainerRef = useRef<HTMLDivElement>(null);
   const dotRef = useRef<HTMLDivElement>(null);
+  const selectionIdleTimerRef = useRef<number | null>(null);
+  const selectionUpdateRafRef = useRef<number | null>(null);
+  const selectionVersionRef = useRef(0);
+  const lastPointerRef = useRef<{ x: number; y: number } | null>(null);
   const streamPortRef = useRef<chrome.runtime.Port | null>(null);
+  const autoResizeRafRef = useRef<number | null>(null);
+  const panelSizeRef = useRef(panelSize);
+  const dragOffsetRef = useRef(dragOffset);
+  const positionRef = useRef(position);
+  const showPanelRef = useRef(showPanel);
 
   const t = translations.content;
 
   useEffect(() => {
     setLang(getUILanguage());
   }, []);
+
+  useEffect(() => {
+    panelSizeRef.current = panelSize;
+  }, [panelSize]);
+
+  useEffect(() => {
+    dragOffsetRef.current = dragOffset;
+  }, [dragOffset]);
+
+  useEffect(() => {
+    positionRef.current = position;
+  }, [position]);
+
+  useEffect(() => {
+    showPanelRef.current = showPanel;
+  }, [showPanel]);
 
   const defaultModels: Record<Provider, string> = {
     minimax: 'MiniMax-M2.1',
@@ -52,7 +116,7 @@ const ContentApp: React.FC<{ isSelectionBlocked: () => Promise<boolean> }> = ({ 
   useEffect(() => {
     const getProviderConfig = async () => {
       const result = await chrome.storage.local.get(['selectedProvider', 'targetLanguage']);
-      const providerValue = (result.selectedProvider as Provider) || 'openai';
+      const providerValue = (result.selectedProvider as Provider) || 'deepseek';
       const modelKey = `${providerValue}Model`;
       const modelResult = await chrome.storage.local.get([modelKey]);
       setModelName((modelResult[modelKey] as string) || defaultModels[providerValue]);
@@ -65,7 +129,7 @@ const ContentApp: React.FC<{ isSelectionBlocked: () => Promise<boolean> }> = ({ 
         setTargetLang((changes.targetLanguage.newValue as string) || '中文');
       }
       if (changes.selectedProvider) {
-        const providerValue = (changes.selectedProvider.newValue as Provider) || 'openai';
+        const providerValue = (changes.selectedProvider.newValue as Provider) || 'deepseek';
         const modelKey = `${providerValue}Model`;
         chrome.storage.local.get([modelKey], (modelResult) => {
           setModelName((modelResult[modelKey] as string) || defaultModels[providerValue]);
@@ -73,7 +137,7 @@ const ContentApp: React.FC<{ isSelectionBlocked: () => Promise<boolean> }> = ({ 
       }
       if (changes.openaiModel || changes.anthropicModel || changes.minimaxModel || changes.deepseekModel || changes.glmModel) {
         chrome.storage.local.get(['selectedProvider'], (result) => {
-          const providerValue = (result.selectedProvider as Provider) || 'openai';
+          const providerValue = (result.selectedProvider as Provider) || 'deepseek';
           const modelKey = `${providerValue}Model`;
           chrome.storage.local.get([modelKey], (modelResult) => {
             setModelName((modelResult[modelKey] as string) || defaultModels[providerValue]);
@@ -140,6 +204,7 @@ const ContentApp: React.FC<{ isSelectionBlocked: () => Promise<boolean> }> = ({ 
     e.stopPropagation();
     setIsResizing(true);
     setResizeDirection(direction);
+    setIsUserSized(true);
 
     const panelRect = panelRef.current?.getBoundingClientRect();
     if (!panelRect) return;
@@ -168,21 +233,23 @@ const ContentApp: React.FC<{ isSelectionBlocked: () => Promise<boolean> }> = ({ 
       let newOffsetX = resizeStartRef.current.startX;
       let newOffsetY = resizeStartRef.current.startY;
 
+      const { minWidth, maxWidth, minHeight, maxHeight } = getPanelConstraints();
+
       if (resizeDirection.includes('e')) {
-        newWidth = Math.max(300, Math.min(800, resizeStartRef.current.startWidth + deltaX));
+        newWidth = Math.max(minWidth, Math.min(maxWidth, resizeStartRef.current.startWidth + deltaX));
       } else if (resizeDirection.includes('w')) {
         const potentialWidth = resizeStartRef.current.startWidth - deltaX;
-        if (potentialWidth >= 300 && potentialWidth <= 800) {
+        if (potentialWidth >= minWidth && potentialWidth <= maxWidth) {
           newWidth = potentialWidth;
           newOffsetX = resizeStartRef.current.startX + deltaX;
         }
       }
 
       if (resizeDirection.includes('s')) {
-        newHeight = Math.max(300, Math.min(700, resizeStartRef.current.startHeight + deltaY));
+        newHeight = Math.max(minHeight, Math.min(maxHeight, resizeStartRef.current.startHeight + deltaY));
       } else if (resizeDirection.includes('n')) {
         const potentialHeight = resizeStartRef.current.startHeight - deltaY;
-        if (potentialHeight >= 300 && potentialHeight <= 700) {
+        if (potentialHeight >= minHeight && potentialHeight <= maxHeight) {
           newHeight = potentialHeight;
           newOffsetY = resizeStartRef.current.startY + deltaY;
         }
@@ -208,64 +275,108 @@ const ContentApp: React.FC<{ isSelectionBlocked: () => Promise<boolean> }> = ({ 
   }, [isResizing, resizeDirection]);
 
   useEffect(() => {
-    const handleMouseUp = async (e: MouseEvent) => {
+    const selectionIdleDelay = 300;
+
+    const updateFromSelection = () => {
       if (isResizing || isDragging) return;
-      if (dotRef.current?.contains(e.target as Node) || panelRef.current?.contains(e.target as Node)) {
+      const sel = window.getSelection();
+      if (!sel || sel.rangeCount === 0) {
+        setShowDot(false);
+        if (!loading) setShowPanel(false);
         return;
       }
 
-      const sel = window.getSelection();
-      const text = sel?.toString().trim();
+      const text = sel.toString().trim();
+      if (!text) {
+        setShowDot(false);
+        if (!loading) setShowPanel(false);
+        return;
+      }
 
-      if (text && text.length > 0) {
-        const blocked = await isSelectionBlocked();
-        if (!blocked) {
-          const range = sel?.getRangeAt(0);
-          const rect = range?.getBoundingClientRect();
+      const range = sel.getRangeAt(0);
+      let rect = range.getBoundingClientRect();
+      if (!rect || (rect.width === 0 && rect.height === 0)) {
+        const rects = range.getClientRects();
+        rect = rects.length > 0 ? rects[0] : rect;
+      }
 
-          if (rect) {
-            setSelection(text);
-            setPosition({
-              x: rect.left + window.scrollX,
-              y: rect.top + window.scrollY
-            });
-            setShowDot(true);
-            setShowPanel(false);
-          }
-        } else {
-          if (!panelRef.current?.contains(e.target as Node)) {
-            setShowDot(false);
-            if (!loading) setShowPanel(false);
-          }
-        }
-      } else {
-        if (!panelRef.current?.contains(e.target as Node)) {
-          setShowDot(false);
-          if (!loading) setShowPanel(false);
+      if (!rect || (rect.width === 0 && rect.height === 0)) {
+        const anchorNode = sel.anchorNode || sel.focusNode;
+        const anchorElement = anchorNode
+          ? (anchorNode.nodeType === Node.ELEMENT_NODE
+            ? (anchorNode as Element)
+            : (anchorNode.parentElement as Element | null))
+          : null;
+        if (anchorElement) {
+          rect = anchorElement.getBoundingClientRect();
         }
       }
+
+      if (!rect || (rect.width === 0 && rect.height === 0)) {
+        if (lastPointerRef.current) {
+          setSelection(text);
+          setPosition({
+            x: lastPointerRef.current.x + window.scrollX,
+            y: lastPointerRef.current.y + window.scrollY,
+          });
+          setShowDot(true);
+          setShowPanel(false);
+        }
+        return;
+      }
+
+      setSelection(text);
+      setPosition({
+        x: rect.left + window.scrollX,
+        y: rect.top + window.scrollY,
+      });
+      setShowDot(true);
+      setShowPanel(false);
     };
 
-    document.addEventListener('mouseup', handleMouseUp);
-    return () => document.removeEventListener('mouseup', handleMouseUp);
+    const scheduleSelectionUpdate = () => {
+      selectionVersionRef.current += 1;
+      const currentVersion = selectionVersionRef.current;
+      if (selectionIdleTimerRef.current) window.clearTimeout(selectionIdleTimerRef.current);
+      selectionIdleTimerRef.current = window.setTimeout(() => {
+        if (selectionVersionRef.current !== currentVersion) return;
+        if (selectionUpdateRafRef.current) cancelAnimationFrame(selectionUpdateRafRef.current);
+        selectionUpdateRafRef.current = requestAnimationFrame(updateFromSelection);
+      }, selectionIdleDelay);
+    };
+
+    const handleMouseUp = (e: MouseEvent) => {
+      if (dotRef.current?.contains(e.target as Node) || panelRef.current?.contains(e.target as Node)) {
+        return;
+      }
+      lastPointerRef.current = { x: e.clientX, y: e.clientY };
+      scheduleSelectionUpdate();
+    };
+
+    const handleSelectionChange = () => {
+      scheduleSelectionUpdate();
+    };
+
+    // Capture to handle pages that stop mouseup propagation (e.g., GitHub code views)
+    document.addEventListener('mouseup', handleMouseUp, true);
+    document.addEventListener('selectionchange', handleSelectionChange, true);
+    return () => {
+      document.removeEventListener('mouseup', handleMouseUp, true);
+      document.removeEventListener('selectionchange', handleSelectionChange, true);
+      if (selectionIdleTimerRef.current) window.clearTimeout(selectionIdleTimerRef.current);
+      if (selectionUpdateRafRef.current) cancelAnimationFrame(selectionUpdateRafRef.current);
+    };
   }, [loading, isResizing, isDragging]);
 
   const handleTriggerQuery = async () => {
-    // Check if selection is in blacklisted area
-    const blocked = await isSelectionBlocked();
-    if (blocked) {
-      console.log('[Select AI] Selection is in blocked area');
-      return;
-    }
-
     setShowDot(false);
     setShowPanel(true);
     setLoading(true);
-    setError(null);
     setResult('');
     setIsTextExpanded(false);
     setDragOffset({ x: 0, y: 0 });
-    setPanelSize({ width: 400, height: 450 });
+    setPanelSize(getDefaultPanelSize());
+    setIsUserSized(false);
 
     const sel = window.getSelection();
     const context = sel ? ContextExtractor.getContext(sel) : '';
@@ -274,7 +385,7 @@ const ContentApp: React.FC<{ isSelectionBlocked: () => Promise<boolean> }> = ({ 
 
     if (!chrome.runtime?.id) {
       setLoading(false);
-      setError(t.extUpdated[lang]);
+      console.error('[AI Search] Extension context invalidated');
       return;
     }
 
@@ -293,7 +404,7 @@ const ContentApp: React.FC<{ isSelectionBlocked: () => Promise<boolean> }> = ({ 
           setLoading(false);
         } else if (message?.type === 'error') {
           setLoading(false);
-          setError(message.error || 'Streaming error');
+          console.error('[AI Search] Stream error:', message.error || 'Streaming error');
         }
       });
 
@@ -309,9 +420,9 @@ const ContentApp: React.FC<{ isSelectionBlocked: () => Promise<boolean> }> = ({ 
       setLoading(false);
       const errorStr = String(e);
       if (errorStr.includes('Extension context invalidated')) {
-        setError(t.extUpdated[lang]);
+        console.error('[AI Search] Extension context invalidated');
       } else {
-        setError('Request failed: ' + errorStr);
+        console.error('[AI Search] Request failed:', errorStr);
       }
     }
   };
@@ -320,8 +431,74 @@ const ContentApp: React.FC<{ isSelectionBlocked: () => Promise<boolean> }> = ({ 
     if (!showPanel) {
       disconnectStreamPort();
       setLoading(false);
+      setIsUserSized(false);
     }
   }, [showPanel]);
+
+  useEffect(() => {
+    if (!showPanel || isResizing || isUserSized) return;
+    if (autoResizeRafRef.current) cancelAnimationFrame(autoResizeRafRef.current);
+    autoResizeRafRef.current = requestAnimationFrame(() => {
+      autoResizeRafRef.current = null;
+      const scrollContainer = scrollContainerRef.current;
+      const panel = panelRef.current;
+      if (!scrollContainer || !panel) return;
+
+      const { minWidth, maxWidth, minHeight, maxHeight } = getPanelConstraints();
+      const extraHeight = Math.max(0, scrollContainer.scrollHeight - scrollContainer.clientHeight);
+      const extraWidth = Math.max(0, scrollContainer.scrollWidth - scrollContainer.clientWidth);
+
+      if (extraHeight < 2 && extraWidth < 2) return;
+
+      const nextWidth = clampValue(panelSize.width + extraWidth, minWidth, maxWidth);
+      const nextHeight = clampValue(panelSize.height + extraHeight, minHeight, maxHeight);
+
+      if (nextWidth !== panelSize.width || nextHeight !== panelSize.height) {
+        setPanelSize({ width: nextWidth, height: nextHeight });
+      }
+    });
+
+    return () => {
+      if (autoResizeRafRef.current) cancelAnimationFrame(autoResizeRafRef.current);
+    };
+  }, [result, loading, isTextExpanded, showPanel, isResizing, isUserSized, panelSize]);
+
+  useEffect(() => {
+    const handleViewportResize = () => {
+      if (!showPanelRef.current) return;
+      const { minWidth, maxWidth, minHeight, maxHeight, safeMargin, viewportWidth, viewportHeight } = getPanelConstraints();
+      const currentSize = panelSizeRef.current;
+      const nextWidth = clampValue(currentSize.width, minWidth, maxWidth);
+      const nextHeight = clampValue(currentSize.height, minHeight, maxHeight);
+
+      if (nextWidth !== currentSize.width || nextHeight !== currentSize.height) {
+        setPanelSize({ width: nextWidth, height: nextHeight });
+      }
+
+      const currentOffset = dragOffsetRef.current;
+      const currentPosition = positionRef.current;
+      const rawLeft = currentPosition.x - 20 + currentOffset.x;
+      const rawTop = currentPosition.y - window.scrollY + 5 + currentOffset.y;
+      const maxLeft = Math.max(safeMargin, viewportWidth - nextWidth - safeMargin);
+      const maxTop = Math.max(safeMargin, viewportHeight - nextHeight - safeMargin);
+      const clampedLeft = clampValue(rawLeft, safeMargin, maxLeft);
+      const clampedTop = clampValue(rawTop, safeMargin, maxTop);
+      const nextOffsetX = currentOffset.x + (clampedLeft - rawLeft);
+      const nextOffsetY = currentOffset.y + (clampedTop - rawTop);
+
+      if (nextOffsetX !== currentOffset.x || nextOffsetY !== currentOffset.y) {
+        setDragOffset({ x: nextOffsetX, y: nextOffsetY });
+      }
+    };
+
+    window.addEventListener('resize', handleViewportResize);
+    window.visualViewport?.addEventListener('resize', handleViewportResize);
+
+    return () => {
+      window.removeEventListener('resize', handleViewportResize);
+      window.visualViewport?.removeEventListener('resize', handleViewportResize);
+    };
+  }, []);
 
   useEffect(() => {
     return () => {
@@ -349,10 +526,16 @@ const ContentApp: React.FC<{ isSelectionBlocked: () => Promise<boolean> }> = ({ 
     transition: 'transform 0.15s',
   };
 
+  const { safeMargin, viewportWidth, viewportHeight } = getPanelConstraints();
+  const rawPanelLeft = position.x - 20 + dragOffset.x;
+  const rawPanelTop = position.y - window.scrollY + 5 + dragOffset.y;
+  const maxPanelLeft = Math.max(safeMargin, viewportWidth - panelSize.width - safeMargin);
+  const maxPanelTop = Math.max(safeMargin, viewportHeight - panelSize.height - safeMargin);
+
   const panelStyle: React.CSSProperties = {
     position: 'fixed',
-    left: Math.min(Math.max(10, position.x - 20), window.innerWidth - panelSize.width - 20) + dragOffset.x,
-    top: Math.min(position.y - window.scrollY + 5, window.innerHeight - panelSize.height - 20) + dragOffset.y,
+    left: clampValue(rawPanelLeft, safeMargin, maxPanelLeft),
+    top: clampValue(rawPanelTop, safeMargin, maxPanelTop),
     zIndex: 2147483647,
     width: panelSize.width,
     height: panelSize.height,
@@ -460,14 +643,6 @@ const ContentApp: React.FC<{ isSelectionBlocked: () => Promise<boolean> }> = ({ 
     borderTop: '2px solid #3b82f6',
     borderRadius: '50%',
     animation: 'spin 1s linear infinite',
-  };
-
-  const errorStyle: React.CSSProperties = {
-    backgroundColor: '#fef2f2',
-    color: '#dc2626',
-    padding: 12,
-    borderRadius: 8,
-    fontSize: 13,
   };
 
   const footerStyle: React.CSSProperties = {
@@ -671,73 +846,67 @@ const ContentApp: React.FC<{ isSelectionBlocked: () => Promise<boolean> }> = ({ 
 
             <div style={dividerStyle} />
 
-            <div style={{ flex: 1, overflowY: 'auto', minHeight: 0 }}>
-              {error ? (
-                <div style={errorStyle}>
-                  <strong>{t.errorTitle[lang]}</strong> {error}
-                </div>
-              ) : (
-                <>
-                  {loading && !result && (
-                    <div style={loadingStyle}>
-                      <div style={spinnerStyle} />
-                      <span>{t.loading[lang]}</span>
-                    </div>
-                  )}
-                  {(!loading || result) && (
-                    <div style={resultStyle}>
-                      <ReactMarkdown
-                        components={{
-                          p: ({ children }) => <p style={{ margin: '0 0 6px 0', lineHeight: 1.6 }}>{children}</p>,
-                          strong: ({ children }) => <strong style={{ fontWeight: 600, color: '#111827' }}>{children}</strong>,
-                          em: ({ children }) => <em style={{ fontStyle: 'italic' }}>{children}</em>,
-                          ul: ({ children }) => <ul style={{ margin: '4px 0', paddingLeft: 18 }}>{children}</ul>,
-                          ol: ({ children }) => <ol style={{ margin: '4px 0', paddingLeft: 18 }}>{children}</ol>,
-                          li: ({ children }) => <li style={{ marginBottom: 2 }}>{children}</li>,
-                          code: ({ children }) => (
-                            <code style={{
-                              backgroundColor: '#f3f4f6',
-                              padding: '1px 5px',
-                              borderRadius: 3,
-                              fontSize: 13,
-                              fontFamily: 'Monaco, Consolas, monospace'
-                            }}>{children}</code>
-                          ),
-                          pre: ({ children }) => (
-                            <pre style={{
-                              backgroundColor: '#f3f4f6',
-                              padding: 10,
-                              borderRadius: 6,
-                              overflow: 'auto',
-                              fontSize: 13,
-                              margin: '6px 0',
-                              fontFamily: 'Monaco, Consolas, monospace'
-                            }}>{children}</pre>
-                          ),
-                          h1: ({ children }) => <h1 style={{ fontSize: 16, fontWeight: 700, margin: '8px 0 4px' }}>{children}</h1>,
-                          h2: ({ children }) => <h2 style={{ fontSize: 15, fontWeight: 600, margin: '6px 0 3px' }}>{children}</h2>,
-                          h3: ({ children }) => <h3 style={{ fontSize: 14, fontWeight: 600, margin: '4px 0 2px' }}>{children}</h3>,
-                          a: ({ href, children }) => (
-                            <a href={href} target="_blank" rel="noopener noreferrer"
-                               style={{ color: '#3b82f6', textDecoration: 'underline' }}>{children}</a>
-                          ),
-                          blockquote: ({ children }) => (
-                            <blockquote style={{
-                              borderLeft: '3px solid #e5e7eb',
-                              paddingLeft: 10,
-                              margin: '4px 0',
-                              color: '#6b7280'
-                            }}>{children}</blockquote>
-                          ),
-                          br: () => <br style={{ lineHeight: 0.5 }} />,
-                        }}
-                      >
-                        {parseXmlResponse(result, lang)}
-                      </ReactMarkdown>
-                    </div>
-                  )}
-                </>
-              )}
+            <div ref={scrollContainerRef} style={{ flex: 1, overflowY: 'auto', minHeight: 0 }}>
+              <>
+                {loading && !result && (
+                  <div style={loadingStyle}>
+                    <div style={spinnerStyle} />
+                    <span>{t.loading[lang]}</span>
+                  </div>
+                )}
+                {(!loading || result) && (
+                  <div style={resultStyle}>
+                    <ReactMarkdown
+                      components={{
+                        p: ({ children }) => <p style={{ margin: '0 0 6px 0', lineHeight: 1.6 }}>{children}</p>,
+                        strong: ({ children }) => <strong style={{ fontWeight: 600, color: '#111827' }}>{children}</strong>,
+                        em: ({ children }) => <em style={{ fontStyle: 'italic' }}>{children}</em>,
+                        ul: ({ children }) => <ul style={{ margin: '4px 0', paddingLeft: 18 }}>{children}</ul>,
+                        ol: ({ children }) => <ol style={{ margin: '4px 0', paddingLeft: 18 }}>{children}</ol>,
+                        li: ({ children }) => <li style={{ marginBottom: 2 }}>{children}</li>,
+                        code: ({ children }) => (
+                          <code style={{
+                            backgroundColor: '#f3f4f6',
+                            padding: '1px 5px',
+                            borderRadius: 3,
+                            fontSize: 13,
+                            fontFamily: 'Monaco, Consolas, monospace'
+                          }}>{children}</code>
+                        ),
+                        pre: ({ children }) => (
+                          <pre style={{
+                            backgroundColor: '#f3f4f6',
+                            padding: 10,
+                            borderRadius: 6,
+                            overflow: 'auto',
+                            fontSize: 13,
+                            margin: '6px 0',
+                            fontFamily: 'Monaco, Consolas, monospace'
+                          }}>{children}</pre>
+                        ),
+                        h1: ({ children }) => <h1 style={{ fontSize: 16, fontWeight: 700, margin: '8px 0 4px' }}>{children}</h1>,
+                        h2: ({ children }) => <h2 style={{ fontSize: 15, fontWeight: 600, margin: '6px 0 3px' }}>{children}</h2>,
+                        h3: ({ children }) => <h3 style={{ fontSize: 14, fontWeight: 600, margin: '4px 0 2px' }}>{children}</h3>,
+                        a: ({ href, children }) => (
+                          <a href={href} target="_blank" rel="noopener noreferrer"
+                             style={{ color: '#3b82f6', textDecoration: 'underline' }}>{children}</a>
+                        ),
+                        blockquote: ({ children }) => (
+                          <blockquote style={{
+                            borderLeft: '3px solid #e5e7eb',
+                            paddingLeft: 10,
+                            margin: '4px 0',
+                            color: '#6b7280'
+                          }}>{children}</blockquote>
+                        ),
+                        br: () => <br style={{ lineHeight: 0.5 }} />,
+                      }}
+                    >
+                      {parseXmlResponse(result, lang)}
+                    </ReactMarkdown>
+                  </div>
+                )}
+              </>
             </div>
 
             {!loading && result && (

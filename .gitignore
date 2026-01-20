@@ -18,9 +18,11 @@ dist-ssr
 .idea
 .DS_Store
 .claude/
+.trae/
 *.suo
 *.ntvs*
 *.njsproj
 *.sln
 *.sw?
 CLAUDE.md
+docs/
