@@ -63,7 +63,7 @@ function App() {
     // Check if chrome API is available (running in extension context)
     if (typeof chrome !== 'undefined' && chrome.storage) {
       chrome.storage.local.get(['selectedProvider'], async (result) => {
-        const selectedProvider = (result.selectedProvider as Provider) || 'openai';
+        const selectedProvider = (result.selectedProvider as Provider) || 'deepseek';
         const config = PROVIDER_CONFIGS[selectedProvider];
         const storageKey = config.storageKey;
 

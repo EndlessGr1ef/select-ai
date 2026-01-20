@@ -77,7 +77,7 @@ const API_CONFIGS: Record<Provider, ProviderApiConfig> = {
 chrome.runtime.onInstalled.addListener(() => {
   chrome.storage.local.get(['selectedProvider'], (result) => {
     if (!result.selectedProvider) {
-      chrome.storage.local.set({ selectedProvider: 'openai' });
+      chrome.storage.local.set({ selectedProvider: 'deepseek' });
     }
   });
 });
@@ -115,7 +115,7 @@ async function getCachedProviderConfig() {
 
   const settings = await chrome.storage.local.get(['selectedProvider']);
 
-  const provider = (settings.selectedProvider as Provider) || 'openai';
+  const provider = (settings.selectedProvider as Provider) || 'deepseek';
   const config = PROVIDER_CONFIGS[provider];
   const storageKey = config.storageKey;
 

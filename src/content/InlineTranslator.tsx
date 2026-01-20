@@ -4,11 +4,13 @@ import { FloatingButton, useDraggable } from './components/FloatingButton';
 import { SiteBlacklist } from '../utils/SiteBlacklist';
 import { translations } from '../utils/i18n';
 import { detectTextLanguage } from '../utils/language';
-import { buildPlaceholderTemplate } from './utils/placeholder';
+import { buildPlaceholderTemplate, applyPlaceholderTranslation } from './utils/placeholder';
 import {
+  getDirectTextContent,
   getTextSelectors,
   isElementEligible,
   prepareTranslationItems,
+  filterVisibleElements,
 } from './utils/elementDetection';
 import { useTranslationStream } from './hooks/useTranslationStream';
 import { ContentPriority } from '../utils/ContentPriority';
@@ -61,7 +63,7 @@ const InlineTranslatorInner: React.FC<{ blacklist: SiteBlacklist }> = ({ blackli
       color: computedStyle.color,
       backgroundColor: 'transparent',
       fontFamily: computedStyle.fontFamily,
-      fontSize: '0.9em',
+      fontSize: computedStyle.fontSize,
       fontWeight: computedStyle.fontWeight,
       lineHeight: computedStyle.lineHeight,
       textAlign: computedStyle.textAlign,
@@ -86,7 +88,7 @@ const InlineTranslatorInner: React.FC<{ blacklist: SiteBlacklist }> = ({ blackli
       container.style.display = 'none';
       container.style.opacity = '0';
       container.style.transition = 'opacity 0.3s ease';
-      container.style.marginLeft = '6px';
+      container.style.marginLeft = '0.4em';
       container.style.whiteSpace = 'normal';
       container.style.overflowWrap = 'break-word';
       container.style.maxWidth = '100%';
@@ -121,6 +123,14 @@ const InlineTranslatorInner: React.FC<{ blacklist: SiteBlacklist }> = ({ blackli
       const tagName = element.tagName.toLowerCase();
       if (tagName === 'a' && element.parentElement) {
         element.parentElement.insertBefore(container, element.nextSibling);
+      } else if (tagName === 'li' || tagName === 'dt' || tagName === 'dd') {
+        const directText = getDirectTextContent(element);
+        const listChild = element.querySelector(':scope > ul, :scope > ol');
+        if (listChild && directText) {
+          element.insertBefore(container, listChild);
+        } else {
+          element.appendChild(container);
+        }
       } else {
         element.appendChild(container);
       }
@@ -166,7 +176,13 @@ const InlineTranslatorInner: React.FC<{ blacklist: SiteBlacklist }> = ({ blackli
       const isListItem = tagName === 'li' || tagName === 'dt' || tagName === 'dd';
       const isTableCell = tagName === 'td' || tagName === 'th';
       if (isListItem) {
-        element.appendChild(container);
+        const directText = getDirectTextContent(element);
+        const listChild = element.querySelector(':scope > ul, :scope > ol');
+        if (listChild && directText) {
+          element.insertBefore(container, listChild);
+        } else {
+          element.appendChild(container);
+        }
       } else if (isTableCell) {
         // 表格单元格：将翻译容器作为子元素
         element.appendChild(container);
@@ -176,12 +192,23 @@ const InlineTranslatorInner: React.FC<{ blacklist: SiteBlacklist }> = ({ blackli
     }
   };
 
-  const updateTranslation = (id: string, text: string) => {
+  const updateTranslation = (
+    id: string,
+    text: string,
+    placeholder?: ReturnType<typeof buildPlaceholderTemplate>,
+    isFinal: boolean = false
+  ) => {
     const container = document.getElementById(id);
     if (container) {
       const contentDiv = container.querySelector('.translation-content') as HTMLElement;
       if (contentDiv) {
-        contentDiv.innerHTML = parseMarkdown(text);
+        let html: string;
+        if (placeholder) {
+          html = applyPlaceholderTranslation(placeholder, text, parseMarkdown, { isFinal, fallbackToOriginal: true });
+        } else {
+          html = parseMarkdown(text);
+        }
+        contentDiv.innerHTML = html;
         contentDiv.style.display = container.classList.contains('inline-mode') ? 'inline' : 'block';
         const loadingDiv = container.querySelector('.translation-loading') as HTMLElement;
         if (loadingDiv) loadingDiv.style.display = 'none';
@@ -231,13 +258,13 @@ const InlineTranslatorInner: React.FC<{ blacklist: SiteBlacklist }> = ({ blackli
       onDelta: (data) => {
         translationCache.set(id, { text: data, originalHTML, placeholder: placeholderTemplate });
         translatedIds.add(id);
-        updateTranslation(id, data);
+        updateTranslation(id, data, placeholderTemplate, false);
       },
       onDone: (data) => {
         if (data) {
           translationCache.set(id, { text: data, originalHTML, placeholder: placeholderTemplate });
           translatedIds.add(id);
-          updateTranslation(id, data);
+          updateTranslation(id, data, placeholderTemplate, true);
         }
       },
       onError: (error) => {
@@ -310,6 +337,13 @@ const InlineTranslatorInner: React.FC<{ blacklist: SiteBlacklist }> = ({ blackli
       return;
     }
 
+    // Filter out nested elements to avoid duplicate translations
+    elementsToTranslate = filterVisibleElements(elementsToTranslate);
+
+    if (elementsToTranslate.length === 0) {
+      return;
+    }
+
     setIsTranslating(true);
 
     const style = document.createElement('style');
@@ -335,6 +369,10 @@ const InlineTranslatorInner: React.FC<{ blacklist: SiteBlacklist }> = ({ blackli
       }
       .select-ai-translation-container.block-mode {
         vertical-align: top;
+      }
+      .select-ai-translation-container br {
+        display: inline;
+        line-height: 1.4;
       }
     `;
     if (!document.head.querySelector('#select-ai-translation-style')) {

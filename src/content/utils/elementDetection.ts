@@ -15,6 +15,8 @@ export const hasNestedList = (element: Element): boolean => {
   return element.querySelector('ul, ol') !== null;
 };
 
+const INLINE_TAGS = new Set(['span', 'a', 'strong', 'b', 'em', 'i', 'code']);
+
 export const getDirectTextContent = (element: Element): string => {
   let text = '';
   for (const node of element.childNodes) {
@@ -23,11 +25,8 @@ export const getDirectTextContent = (element: Element): string => {
     } else if (node.nodeType === Node.ELEMENT_NODE) {
       const el = node as Element;
       const tagName = el.tagName.toLowerCase();
-      if (['span', 'a', 'strong', 'b', 'em', 'i', 'code'].includes(tagName)) {
-        const outerHTML = el.outerHTML;
-        text += outerHTML;
-      } else {
-        text += el.textContent || '';
+      if (INLINE_TAGS.has(tagName)) {
+        text += el.outerHTML;
       }
     }
   }
@@ -107,15 +106,19 @@ export const prepareTranslationItems = (
     const id = `translation-${Date.now()}-${Math.random().toString(36).substring(2, 11)}`;
     const tagName = element.tagName.toLowerCase();
     const hasNested = tagName === 'li' && hasNestedList(element);
-    const text = hasNested ? getDirectTextContent(element) : (element.textContent?.trim() || '');
+    const hasDescendant = elements.some(otherEl => otherEl !== element && element.contains(otherEl));
+    const directText = getDirectTextContent(element);
+    const text = hasDescendant ? directText : (element.textContent?.trim() || '');
 
     let originalHTML: string | undefined;
-    if (hasNested) {
-      originalHTML = getDirectTextContent(element);
+    if (hasDescendant && directText) {
+      originalHTML = directText;
+    } else if (hasNested && directText) {
+      originalHTML = directText;
     } else {
-      const hasSpanChild = element.querySelector('span');
-      if (hasSpanChild) {
-        originalHTML = getDirectTextContent(element);
+      const hasInlineChild = element.querySelector('span, a, strong, b, em, i, code');
+      if (hasInlineChild && directText) {
+        originalHTML = directText;
       }
     }
 
@@ -136,10 +139,11 @@ export const prepareTranslationItems = (
 export const filterVisibleElements = (elements: Element[]): Element[] => {
   const filteredElements: Element[] = [];
   for (const el of elements) {
-    const hasVisibleChildInList = elements.some(otherEl =>
+    const hasDescendant = elements.some(otherEl =>
       otherEl !== el && el.contains(otherEl)
     );
-    if (!hasVisibleChildInList) {
+    const directText = getDirectTextContent(el);
+    if (!hasDescendant || directText) {
       filteredElements.push(el);
     }
   }

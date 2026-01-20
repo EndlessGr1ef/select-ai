@@ -53,7 +53,7 @@ export const buildPlaceholderTemplate = (originalHTML: string): PlaceholderTempl
 export const parsePlaceholderSegments = (translatedText: string) => {
   const regex = /\[\[\[T(\d+)\]\]\]/g;
   const matches = Array.from(translatedText.matchAll(regex));
-  const segments = new Map<number, string>();
+  const segments = new Map<number, { text: string; start: number; end: number }>();
 
   for (let i = 0; i < matches.length; i += 1) {
     const match = matches[i];
@@ -62,7 +62,11 @@ export const parsePlaceholderSegments = (translatedText: string) => {
     const segmentStart = matchStart + match[0].length;
     const nextMatch = matches[i + 1];
     const segmentEnd = nextMatch?.index ?? translatedText.length;
-    segments.set(tokenIndex, translatedText.slice(segmentStart, segmentEnd));
+    segments.set(tokenIndex, {
+      text: translatedText.slice(segmentStart, segmentEnd),
+      start: segmentStart,
+      end: segmentEnd
+    });
   }
 
   const matchedIndices = matches.map(match => Number(match[1]));
@@ -82,17 +86,54 @@ export const applyPlaceholderTranslation = (
     return parseMarkdown(translatedText);
   }
 
-  const lastMatched = validMatched[validMatched.length - 1];
-  let html = template.templateHTML;
+  // Sort segments by their position in the translated text to ensure correct order
+  const sortedSegments = Array.from(segments.entries())
+    .sort((a, b) => a[1].start - b[1].start);
 
-  template.tokens.forEach((token, index) => {
-    const segment = segments.get(index);
-    const isComplete = options.isFinal || index !== lastMatched;
-    const replacement = segment !== undefined && isComplete
-      ? parseMarkdown(segment)
-      : (options.fallbackToOriginal ? template.originals[index] : '');
-    html = html.replaceAll(token, replacement);
-  });
+  // Build the result by replacing tokens in order
+  let result = template.templateHTML;
+  const tokenReplacements: Map<string, string> = new Map();
 
-  return html;
+  for (const [tokenIndex, segInfo] of sortedSegments) {
+    const originalText = template.originals[tokenIndex];
+    if (!originalText) continue;
+
+    const translatedSegment = segInfo.text;
+    const isComplete = options.isFinal || tokenIndex !== validMatched[validMatched.length - 1];
+
+    // For inline translation, escape HTML but don't wrap in <p>
+    // Just apply basic markdown inline formatting
+    let replacement: string;
+    if (!isComplete || !translatedSegment.trim()) {
+      replacement = escapeHtml(originalText);
+    } else {
+      replacement = escapeHtml(translatedSegment);
+    }
+
+    // Apply inline markdown formatting only (no <p> wrapping)
+    replacement = replacement
+      .replace(/\*\*(.*?)\*\*/g, '<strong>$1</strong>')
+      .replace(/\*(.*?)\*/g, '<em>$1</em>')
+      .replace(/`([^`]+)`/g, '<code style="background: #e2e8f0; padding: 2px 6px; border-radius: 4px; font-family: monospace;">$1</code>');
+
+    tokenReplacements.set(template.tokens[tokenIndex], replacement);
+  }
+
+  // Apply replacements in reverse order (longer tokens first to avoid conflicts)
+  const sortedTokens = Array.from(tokenReplacements.entries())
+    .sort((a, b) => b[0].length - a[0].length);
+
+  for (const [token, replacement] of sortedTokens) {
+    result = result.split(token).join(replacement);
+  }
+
+  return result;
+};
+
+// Simple HTML escape function
+const escapeHtml = (text: string): string => {
+  return text
+    .replace(/&/g, '&amp;')
+    .replace(/</g, '&lt;')
+    .replace(/>/g, '&gt;');
 };

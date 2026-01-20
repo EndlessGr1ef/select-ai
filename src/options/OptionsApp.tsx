@@ -77,10 +77,10 @@ type TabType = 'api' | 'translation';
 
 const OptionsApp: React.FC = () => {
   const [activeTab, setActiveTab] = useState<TabType>('api');
-  const [provider, setProvider] = useState<Provider>('openai');
+  const [provider, setProvider] = useState<Provider>('deepseek');
   const [apiKey, setApiKey] = useState('');
-  const [baseUrl, setBaseUrl] = useState(PROVIDER_CONFIGS.openai.defaultBaseUrl);
-  const [model, setModel] = useState(PROVIDER_CONFIGS.openai.defaultModel);
+  const [baseUrl, setBaseUrl] = useState(PROVIDER_CONFIGS.deepseek.defaultBaseUrl);
+  const [model, setModel] = useState(PROVIDER_CONFIGS.deepseek.defaultModel);
   const [targetLang, setTargetLang] = useState('');
   const [status, setStatus] = useState<{ type: 'success' | 'error' | 'idle', message: string }>({ type: 'idle', message: '' });
   const [lang, setLang] = useState<'zh' | 'en'>('zh');

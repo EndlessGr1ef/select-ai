@@ -12,7 +12,7 @@ export const translations = {
       en: ['Select any text on the webpage', 'Click the pink-purple dot', 'AI will analyze and explain or translate'],
     },
     settingsBtn: { zh: '设置选项', en: 'Settings' },
-    version: { zh: '🚀 v1.0.0', en: '🚀 v1.0.0' },
+    version: { zh: '🚀 v0.3.1', en: '🚀 v0.3.1' },
   },
   options: {
     title: { zh: 'AI 划词搜索', en: 'Select AI' },
