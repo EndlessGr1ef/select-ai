@@ -1,3 +1,5 @@
+import { getAppVersion } from './version'
+
 export const translations = {
   popup: {
     title: { zh: 'AI 划词搜索', en: 'Select AI' },
@@ -12,7 +14,7 @@ export const translations = {
       en: ['Select any text on the webpage', 'Click the pink-purple dot', 'AI will analyze and explain or translate'],
     },
     settingsBtn: { zh: '设置选项', en: 'Settings' },
-    version: { zh: '🚀 v0.3.1', en: '🚀 v0.3.1' },
+    version: { zh: `🚀 v${getAppVersion()}`, en: `🚀 v${getAppVersion()}` },
   },
   options: {
     title: { zh: 'AI 划词搜索', en: 'Select AI' },

@@ -1,11 +1,11 @@
 {
   "name": "select-ai",
   "private": true,
-  "version": "0.0.0",
+  "version": "0.3.1",
   "type": "module",
   "scripts": {
-    "dev": "vite",
-    "build": "tsc -b && vite build",
+    "dev": "pnpm exec node scripts/update-version.js && vite",
+    "build": "pnpm exec node scripts/update-version.js && tsc -b && vite build",
     "lint": "eslint .",
     "preview": "vite preview"
   },
