@@ -81,7 +81,8 @@ export const translations = {
     extUpdated: { zh: '扩展已更新，请刷新页面后重试', en: 'Extension updated, please refresh' },
     noResponse: { zh: '服务未响应，请刷新页面重试', en: 'Service not responding, please retry' },
     copyTitle: { zh: '复制', en: 'Copy' },
-    speakTitle: { zh: '朗读', en: 'Read aloud' },
+    speakTitle: { zh: '朗读译文', en: 'Read translation aloud' },
+    speakOriginalTitle: { zh: '朗读原文', en: 'Read original aloud' },
     // Bilingual translation related
     translateBtn: { zh: '翻译', en: 'Translate' },
     bilingualTitle: { zh: '🔤 双语翻译', en: '🔤 Bilingual' },

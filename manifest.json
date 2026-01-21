@@ -1,8 +1,8 @@
 {
   "manifest_version": 3,
   "name": "Select AI（AI划词解释）",
-  "version": "0.3.2",
-  "description": "AI-powered selection search with context awareness",
+  "version": "0.3.3",
+  "description": "AI划词解释 · 智能上下文分析 · 双语字幕式翻译 | AI-powered Selection Explanation · Smart context analysis · Dual-language subtitle translation",
   "icons": {
     "16": "app-icon.png",
     "48": "app-icon.png",

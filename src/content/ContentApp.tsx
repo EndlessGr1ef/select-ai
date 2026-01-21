@@ -22,6 +22,7 @@ const ContentApp: React.FC = () => {
   const [targetLang, setTargetLang] = useState('中文');
   const [isTextExpanded, setIsTextExpanded] = useState(false);
   const [contextMaxTokens, setContextMaxTokens] = useState(2000);
+  const [sourceLang, setSourceLang] = useState<string | null>(null);
 
   const clampValue = (value: number, min: number, max: number) => Math.min(Math.max(value, min), max);
 
@@ -87,11 +88,35 @@ const ContentApp: React.FC = () => {
   const dragOffsetRef = useRef(dragOffset);
   const positionRef = useRef(position);
   const showPanelRef = useRef(showPanel);
+  const voicesLoadedRef = useRef(false);
 
   const t = translations.content;
 
   useEffect(() => {
     setLang(getUILanguage());
+  }, []);
+
+  // Preload speech synthesis voices
+  useEffect(() => {
+    const synthesis = window.speechSynthesis;
+    if (!synthesis) return;
+
+    const loadVoices = () => {
+      const voices = synthesis.getVoices();
+      if (voices.length > 0) {
+        voicesLoadedRef.current = true;
+      }
+    };
+
+    // Try to load immediately
+    loadVoices();
+
+    // Also listen for voiceschanged event (needed on some browsers)
+    synthesis.addEventListener('voiceschanged', loadVoices);
+
+    return () => {
+      synthesis.removeEventListener('voiceschanged', loadVoices);
+    };
   }, []);
 
   useEffect(() => {
@@ -422,6 +447,7 @@ const ContentApp: React.FC = () => {
     setDragOffset({ x: 0, y: 0 });
     setPanelSize(getDefaultPanelSize());
     setIsUserSized(false);
+    setSourceLang(null);
     disconnectKanaStreamPort();
 
     const sel = window.getSelection();
@@ -443,10 +469,17 @@ const ContentApp: React.FC = () => {
       const port = chrome.runtime.connect({ name: 'ai-stream' });
       streamPortRef.current = port;
 
+      let accumulatedResult = '';
       port.onMessage.addListener((message) => {
         if (message?.type === 'delta') {
-          setResult((prev) => prev + (message.data || ''));
+          accumulatedResult += (message.data || '');
+          setResult(accumulatedResult);
           setLoading(false);
+          // Try to extract source language from accumulated result
+          const detectedLang = extractSourceLang(accumulatedResult);
+          if (detectedLang) {
+            setSourceLang(detectedLang);
+          }
         } else if (message?.type === 'done') {
           setLoading(false);
         } else if (message?.type === 'error') {
@@ -796,8 +829,11 @@ const ContentApp: React.FC = () => {
 
   // Parse XML response from AI and format for display
   const parseXmlResponse = (text: string, uiLang: 'zh' | 'en'): string => {
-    const baseMatch = text.match(/<base>([\s\S]*?)<\/base>/);
-    const contextMatch = text.match(/<context>([\s\S]*?)<\/context>/);
+    // Remove source_lang tag first (used for TTS, not displayed)
+    const cleanedText = text.replace(/<source_lang>[^<]*<\/source_lang>\s*/gi, '');
+
+    const baseMatch = cleanedText.match(/<base>([\s\S]*?)<\/base>/);
+    const contextMatch = cleanedText.match(/<context>([\s\S]*?)<\/context>/);
 
     if (baseMatch || contextMatch) {
       const baseLabel = uiLang === 'zh' ? '基础含义' : 'Base meaning';
@@ -808,7 +844,42 @@ const ContentApp: React.FC = () => {
       if (contextMatch) formatted += `**${contextLabel}:** ${contextMatch[1].trim()}`;
       return formatted;
     }
-    return text;
+    return cleanedText;
+  };
+
+  // Extract source language from AI response
+  const extractSourceLang = (text: string): string | null => {
+    const match = text.match(/<source_lang>([a-z]{2,5})<\/source_lang>/i);
+    return match ? match[1].toLowerCase() : null;
+  };
+
+  // Map short language code to TTS language code
+  const mapLangCodeToTTS = (code: string): string => {
+    const map: Record<string, string> = {
+      'en': 'en-US',
+      'ja': 'ja-JP',
+      'zh': 'zh-CN',
+      'ko': 'ko-KR',
+      'fr': 'fr-FR',
+      'de': 'de-DE',
+      'es': 'es-ES',
+      'it': 'it-IT',
+      'pt': 'pt-BR',
+      'ru': 'ru-RU',
+    };
+    return map[code] || 'en-US';
+  };
+
+  // Detect language for TTS (fallback)
+  const detectLanguageForTTS = (text: string): string => {
+    // Japanese detection (contains hiragana/katakana or identified as Japanese)
+    if (isLikelyJapanese(text)) return 'ja-JP';
+    // Chinese detection
+    const chineseChars = text.match(/[\u4e00-\u9fff]/g) || [];
+    const chineseRatio = chineseChars.length / text.length;
+    if (chineseRatio > 0.1) return 'zh-CN';
+    // Default to English
+    return 'en-US';
   };
 
   // Strip markdown symbols for speech
@@ -829,19 +900,130 @@ const ContentApp: React.FC = () => {
       .trim();
   };
 
-  // Speech synthesis handler
-  const handleSpeak = () => {
-    if (!result) return;
+  // Map target language name to TTS language code
+  const getTargetLangTTSCode = (target: string): string => {
+    const langMap: Record<string, string> = {
+      '中文': 'zh-CN',
+      '简体中文': 'zh-CN',
+      '繁體中文': 'zh-TW',
+      'Chinese': 'zh-CN',
+      '英语': 'en-US',
+      '英文': 'en-US',
+      'English': 'en-US',
+      '日语': 'ja-JP',
+      '日本語': 'ja-JP',
+      'Japanese': 'ja-JP',
+      '韩语': 'ko-KR',
+      '한국어': 'ko-KR',
+      'Korean': 'ko-KR',
+      '法语': 'fr-FR',
+      'French': 'fr-FR',
+      '德语': 'de-DE',
+      'German': 'de-DE',
+      '西班牙语': 'es-ES',
+      'Spanish': 'es-ES',
+    };
+    return langMap[target] || 'en-US';
+  };
+
+  // Get the best available voice for a language
+  const getBestVoice = (langCode: string): SpeechSynthesisVoice | null => {
+    const synthesis = window.speechSynthesis;
+    if (!synthesis) return null;
+
+    const voices = synthesis.getVoices();
+    if (!voices.length) return null;
+
+    // Filter voices matching the language
+    const langPrefix = langCode.split('-')[0].toLowerCase();
+    const matchingVoices = voices.filter(v => 
+      v.lang.toLowerCase().startsWith(langPrefix)
+    );
+
+    if (!matchingVoices.length) return null;
+
+    // Quality indicators in voice names (higher priority first)
+    const qualityKeywords = [
+      'premium', 'enhanced', 'neural', 'natural', 'wavenet', 'studio',
+      // macOS high-quality voices
+      'samantha', 'alex', 'karen', 'daniel', 'moira', 'tessa', 'fiona',
+      // Common high-quality voice names
+      'zira', 'david', 'mark', 'hazel', 'george', 'susan', 'linda',
+    ];
+
+    // Score each voice based on quality indicators
+    const scoredVoices = matchingVoices.map(voice => {
+      let score = 0;
+      const nameLower = voice.name.toLowerCase();
+      
+      // Check for quality keywords
+      for (const keyword of qualityKeywords) {
+        if (nameLower.includes(keyword)) {
+          score += 10;
+        }
+      }
+      
+      // Prefer local voices over remote (often higher quality on modern OS)
+      if (voice.localService) {
+        score += 5;
+      }
+      
+      // Prefer voices with exact language match
+      if (voice.lang.toLowerCase() === langCode.toLowerCase()) {
+        score += 3;
+      }
+
+      return { voice, score };
+    });
+
+    // Sort by score descending
+    scoredVoices.sort((a, b) => b.score - a.score);
+
+    return scoredVoices[0]?.voice || matchingVoices[0];
+  };
+
+  // Speak text with best available voice
+  const speakWithBestVoice = (text: string, langCode: string) => {
     const synthesis = window.speechSynthesis;
     if (!synthesis) return;
 
     synthesis.cancel();
 
+    const utterance = new SpeechSynthesisUtterance(text);
+    utterance.lang = langCode;
+
+    // Try to get the best voice
+    const bestVoice = getBestVoice(langCode);
+    if (bestVoice) {
+      utterance.voice = bestVoice;
+    }
+
+    // Adjust speech parameters for more natural sound
+    utterance.rate = 0.95; // Slightly slower for clarity
+    utterance.pitch = 1.0;
+
+    synthesis.speak(utterance);
+  };
+
+  // Speech synthesis handler for translation result
+  const handleSpeak = () => {
+    if (!result) return;
+
     const parsedResult = parseXmlResponse(result, lang);
     const textToSpeak = stripMarkdown(parsedResult);
-    const utterance = new SpeechSynthesisUtterance(textToSpeak);
-    utterance.lang = lang === 'zh' ? 'zh-CN' : 'en-US';
-    synthesis.speak(utterance);
+    speakWithBestVoice(textToSpeak, getTargetLangTTSCode(targetLang));
+  };
+
+  // Speech synthesis handler for original text
+  const handleSpeakOriginal = () => {
+    if (!selection) return;
+
+    // Priority: AI-detected language > local detection
+    const langCode = sourceLang 
+      ? mapLangCodeToTTS(sourceLang) 
+      : detectLanguageForTTS(selection);
+    
+    speakWithBestVoice(selection, langCode);
   };
 
   // Stop speech when panel closes
@@ -956,34 +1138,51 @@ const ContentApp: React.FC = () => {
 
           <div style={contentStyle}>
             <div style={selectionContainerStyle}>
-              {shouldRequestKana(selection, lastLocalContext) && kanaLoading && !kanaText && (
-                <div style={kanaTextStyle}>
-                  {lang === 'zh' ? '平假名生成中...' : 'Generating hiragana...'}
+              <div style={{ display: 'flex', alignItems: 'flex-start', gap: 8 }}>
+                <div style={{ flex: 1 }}>
+                  {shouldRequestKana(selection, lastLocalContext) && kanaLoading && !kanaText && (
+                    <div style={kanaTextStyle}>
+                      {lang === 'zh' ? '平假名生成中...' : 'Generating hiragana...'}
+                    </div>
+                  )}
+                  {shouldRequestKana(selection, lastLocalContext) && kanaText && (isTextExpanded || selection.length <= 150) ? (
+                    <div
+                      className="select-ai-kana"
+                      style={selectionTitleStyle}
+                      dangerouslySetInnerHTML={{ __html: sanitizeRubyMarkup(kanaText) }}
+                    />
+                  ) : (
+                    <div style={selectionTitleStyle}>
+                      {selection.length > 150 && !isTextExpanded
+                        ? selection.substring(0, 120) + '...'
+                        : selection}
+                    </div>
+                  )}
+                  {selection.length > 150 && (
+                    <button
+                      style={toggleButtonStyle}
+                      onClick={() => setIsTextExpanded(!isTextExpanded)}
+                      onMouseOver={(e) => (e.currentTarget.style.opacity = '0.8')}
+                      onMouseOut={(e) => (e.currentTarget.style.opacity = '1')}
+                    >
+                      {isTextExpanded ? (lang === 'zh' ? '收起' : 'Collapse') : (lang === 'zh' ? '展开全文' : 'Expand')}
+                    </button>
+                  )}
                 </div>
-              )}
-              {shouldRequestKana(selection, lastLocalContext) && kanaText && (isTextExpanded || selection.length <= 150) ? (
-                <div
-                  className="select-ai-kana"
-                  style={selectionTitleStyle}
-                  dangerouslySetInnerHTML={{ __html: sanitizeRubyMarkup(kanaText) }}
-                />
-              ) : (
-                <div style={selectionTitleStyle}>
-                  {selection.length > 150 && !isTextExpanded
-                    ? selection.substring(0, 120) + '...'
-                    : selection}
-                </div>
-              )}
-              {selection.length > 150 && (
                 <button
-                  style={toggleButtonStyle}
-                  onClick={() => setIsTextExpanded(!isTextExpanded)}
-                  onMouseOver={(e) => (e.currentTarget.style.opacity = '0.8')}
-                  onMouseOut={(e) => (e.currentTarget.style.opacity = '1')}
+                  style={{
+                    ...actionButtonStyle,
+                    flexShrink: 0,
+                    marginTop: 2,
+                  }}
+                  onClick={handleSpeakOriginal}
+                  title={t.speakOriginalTitle[lang]}
+                  onMouseOver={(e) => (e.currentTarget.style.backgroundColor = '#f3f4f6')}
+                  onMouseOut={(e) => (e.currentTarget.style.backgroundColor = 'transparent')}
                 >
-                  {isTextExpanded ? (lang === 'zh' ? '收起' : 'Collapse') : (lang === 'zh' ? '展开全文' : 'Expand')}
+                  🔊
                 </button>
-              )}
+              </div>
             </div>
 
             <div style={dividerStyle} />
