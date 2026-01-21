@@ -484,7 +484,9 @@ const ContentApp: React.FC = () => {
           setLoading(false);
         } else if (message?.type === 'error') {
           setLoading(false);
-          console.error('[AI Search] Stream error:', message.error || 'Streaming error');
+          const errorMessage = message.error || 'Streaming error';
+          setResult(`**Error:** ${errorMessage}`);
+          console.error('[AI Search] Stream error:', errorMessage);
         }
       });
 
@@ -524,11 +526,7 @@ const ContentApp: React.FC = () => {
       console.error('[AI Search] Send failed:', e);
       setLoading(false);
       const errorStr = String(e);
-      if (errorStr.includes('Extension context invalidated')) {
-        console.error('[AI Search] Extension context invalidated');
-      } else {
-        console.error('[AI Search] Request failed:', errorStr);
-      }
+      setResult(`**Error:** ${errorStr}`);
     }
   };
 
