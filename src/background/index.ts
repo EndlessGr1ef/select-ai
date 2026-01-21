@@ -248,7 +248,7 @@ async function buildRequestConfig(payload: QueryPayload): Promise<RequestConfig>
 5. 请以陈述句回答, 回答内容尽量限制在1000字符以内;
 6. 用中文回答,按markdown格式美化输出;
 7. 禁止使用代码块、内联代码或HTML标签(例如: \`\`\`、\`code\`、<tag>，但source_lang标签除外)`
-    : 
+    :
     `You are a browser selection explanation assistant. Please explain the selected text based on the context, give a precise and concise explanation.
 
 【Must follow rules】
@@ -464,19 +464,32 @@ async function handleAIStream(payload: QueryPayload, port: chrome.runtime.Port):
   const { streamFormat, endpoint, headers, requestBody, isChineseUI } = await buildRequestConfig(payload);
 
   const controller = new AbortController();
+  let timeoutId: number;
 
-  // Timeout control
-  const timeoutId = setTimeout(() => {
-    controller.abort();
-    port.postMessage({ type: 'error', error: isChineseUI ? '请求超时（30秒）' : 'Request timeout (30s)' });
-  }, REQUEST_TIMEOUT);
+  let isDisconnected = false;
+  const safePostMessage = (msg: any) => {
+    if (!isDisconnected) {
+      try {
+        port.postMessage(msg);
+      } catch (e) {
+        console.warn('[AI Search] Safe postMessage failed:', e);
+      }
+    }
+  };
 
   // Cleanup when port disconnects
   const onDisconnect = () => {
-    clearTimeout(timeoutId);
+    isDisconnected = true;
+    if (timeoutId) clearTimeout(timeoutId);
     controller.abort();
   };
   port.onDisconnect.addListener(onDisconnect);
+
+  // Timeout control
+  timeoutId = setTimeout(() => {
+    controller.abort();
+    safePostMessage({ type: 'error', error: isChineseUI ? '请求超时（30秒）' : 'Request timeout (30s)' });
+  }, REQUEST_TIMEOUT) as any;
 
   let doneSent = false;
 
@@ -517,7 +530,7 @@ async function handleAIStream(payload: QueryPayload, port: chrome.runtime.Port):
         const data = trimmed.slice(5).trim();
         if (data === '[DONE]') {
           doneSent = true;
-          port.postMessage({ type: 'done' });
+          safePostMessage({ type: 'done' });
           return;
         }
 
@@ -527,11 +540,11 @@ async function handleAIStream(payload: QueryPayload, port: chrome.runtime.Port):
             ? parseOpenAIStreamPayload(parsed)
             : parseAnthropicStreamPayload(parsed);
           if (result.delta) {
-            port.postMessage({ type: 'delta', data: result.delta });
+            safePostMessage({ type: 'delta', data: result.delta });
           }
           if (result.done) {
             doneSent = true;
-            port.postMessage({ type: 'done' });
+            safePostMessage({ type: 'done' });
             return;
           }
         } catch (error) {
@@ -545,7 +558,7 @@ async function handleAIStream(payload: QueryPayload, port: chrome.runtime.Port):
       const data = remaining.slice(5).trim();
       if (data === '[DONE]') {
         doneSent = true;
-        port.postMessage({ type: 'done' });
+        safePostMessage({ type: 'done' });
         return;
       }
       try {
@@ -554,11 +567,11 @@ async function handleAIStream(payload: QueryPayload, port: chrome.runtime.Port):
           ? parseOpenAIStreamPayload(parsed)
           : parseAnthropicStreamPayload(parsed);
         if (result.delta) {
-          port.postMessage({ type: 'delta', data: result.delta });
+          safePostMessage({ type: 'delta', data: result.delta });
         }
         if (result.done) {
           doneSent = true;
-          port.postMessage({ type: 'done' });
+          safePostMessage({ type: 'done' });
           return;
         }
       } catch (error) {
@@ -567,13 +580,13 @@ async function handleAIStream(payload: QueryPayload, port: chrome.runtime.Port):
     }
   } catch (error) {
     if ((error as Error).name !== 'AbortError') {
-      port.postMessage({ type: 'error', error: (error as Error).message || String(error) });
+      safePostMessage({ type: 'error', error: (error as Error).message || String(error) });
     }
   } finally {
     clearTimeout(timeoutId);
     port.onDisconnect.removeListener(onDisconnect);
     if (!doneSent) {
-      port.postMessage({ type: 'done' });
+      safePostMessage({ type: 'done' });
     }
   }
 }
@@ -582,17 +595,30 @@ async function handleKanaStream(payload: KanaPayload, port: chrome.runtime.Port)
   const { streamFormat, endpoint, headers, requestBody, isChineseUI } = await buildKanaRequestConfig(payload);
 
   const controller = new AbortController();
+  let timeoutId: number;
 
-  const timeoutId = setTimeout(() => {
-    controller.abort();
-    port.postMessage({ type: 'error', error: isChineseUI ? '请求超时（30秒）' : 'Request timeout (30s)' });
-  }, REQUEST_TIMEOUT);
+  let isDisconnected = false;
+  const safePostMessage = (msg: any) => {
+    if (!isDisconnected) {
+      try {
+        port.postMessage(msg);
+      } catch (e) {
+        console.warn('[AI Search] Kana safe postMessage failed:', e);
+      }
+    }
+  };
 
   const onDisconnect = () => {
-    clearTimeout(timeoutId);
+    isDisconnected = true;
+    if (timeoutId) clearTimeout(timeoutId);
     controller.abort();
   };
   port.onDisconnect.addListener(onDisconnect);
+
+  timeoutId = setTimeout(() => {
+    controller.abort();
+    safePostMessage({ type: 'error', error: isChineseUI ? '请求超时（30秒）' : 'Request timeout (30s)' });
+  }, REQUEST_TIMEOUT) as any;
 
   let doneSent = false;
 
@@ -633,7 +659,7 @@ async function handleKanaStream(payload: KanaPayload, port: chrome.runtime.Port)
         const data = trimmed.slice(5).trim();
         if (data === '[DONE]') {
           doneSent = true;
-          port.postMessage({ type: 'done' });
+          safePostMessage({ type: 'done' });
           return;
         }
 
@@ -643,11 +669,11 @@ async function handleKanaStream(payload: KanaPayload, port: chrome.runtime.Port)
             ? parseOpenAIStreamPayload(parsed)
             : parseAnthropicStreamPayload(parsed);
           if (result.delta) {
-            port.postMessage({ type: 'delta', data: result.delta });
+            safePostMessage({ type: 'delta', data: result.delta });
           }
           if (result.done) {
             doneSent = true;
-            port.postMessage({ type: 'done' });
+            safePostMessage({ type: 'done' });
             return;
           }
         } catch (error) {
@@ -661,7 +687,7 @@ async function handleKanaStream(payload: KanaPayload, port: chrome.runtime.Port)
       const data = remaining.slice(5).trim();
       if (data === '[DONE]') {
         doneSent = true;
-        port.postMessage({ type: 'done' });
+        safePostMessage({ type: 'done' });
         return;
       }
       try {
@@ -670,11 +696,11 @@ async function handleKanaStream(payload: KanaPayload, port: chrome.runtime.Port)
           ? parseOpenAIStreamPayload(parsed)
           : parseAnthropicStreamPayload(parsed);
         if (result.delta) {
-          port.postMessage({ type: 'delta', data: result.delta });
+          safePostMessage({ type: 'delta', data: result.delta });
         }
         if (result.done) {
           doneSent = true;
-          port.postMessage({ type: 'done' });
+          safePostMessage({ type: 'done' });
           return;
         }
       } catch (error) {
@@ -683,13 +709,13 @@ async function handleKanaStream(payload: KanaPayload, port: chrome.runtime.Port)
     }
   } catch (error) {
     if ((error as Error).name !== 'AbortError') {
-      port.postMessage({ type: 'error', error: (error as Error).message || String(error) });
+      safePostMessage({ type: 'error', error: (error as Error).message || String(error) });
     }
   } finally {
     clearTimeout(timeoutId);
     port.onDisconnect.removeListener(onDisconnect);
     if (!doneSent) {
-      port.postMessage({ type: 'done' });
+      safePostMessage({ type: 'done' });
     }
   }
 }
@@ -967,19 +993,31 @@ async function handleInlineTranslate(payload: InlineTranslatePayload, port: chro
   const { streamFormat, endpoint, headers, requestBody } = await buildInlineTranslateRequestConfig(payload);
 
   const controller = new AbortController();
+  let timeoutId: number;
 
-  // Timeout control
-  const timeoutId = setTimeout(() => {
-    controller.abort();
-    port.postMessage({ type: 'error', error: 'Request timeout (30s)' });
-  }, REQUEST_TIMEOUT);
+  let isDisconnected = false;
+  const safePostMessage = (msg: any) => {
+    if (!isDisconnected) {
+      try {
+        port.postMessage(msg);
+      } catch (e) {
+        console.warn('[Inline Translate] Safe postMessage failed:', e);
+      }
+    }
+  };
 
-  // Cleanup when port disconnects
   const onDisconnect = () => {
-    clearTimeout(timeoutId);
+    isDisconnected = true;
+    if (timeoutId) clearTimeout(timeoutId);
     controller.abort();
   };
   port.onDisconnect.addListener(onDisconnect);
+
+  // Timeout control
+  timeoutId = setTimeout(() => {
+    controller.abort();
+    safePostMessage({ type: 'error', error: 'Request timeout (30s)' });
+  }, REQUEST_TIMEOUT) as any;
 
   let doneSent = false;
 
@@ -1020,7 +1058,7 @@ async function handleInlineTranslate(payload: InlineTranslatePayload, port: chro
         const data = trimmed.slice(5).trim();
         if (data === '[DONE]') {
           doneSent = true;
-          port.postMessage({ type: 'done' });
+          safePostMessage({ type: 'done' });
           return;
         }
 
@@ -1030,11 +1068,11 @@ async function handleInlineTranslate(payload: InlineTranslatePayload, port: chro
             ? parseOpenAIStreamPayload(parsed)
             : parseAnthropicStreamPayload(parsed);
           if (result.delta) {
-            port.postMessage({ type: 'delta', data: result.delta });
+            safePostMessage({ type: 'delta', data: result.delta });
           }
           if (result.done) {
             doneSent = true;
-            port.postMessage({ type: 'done' });
+            safePostMessage({ type: 'done' });
             return;
           }
         } catch (error) {
@@ -1048,7 +1086,7 @@ async function handleInlineTranslate(payload: InlineTranslatePayload, port: chro
       const data = remaining.slice(5).trim();
       if (data === '[DONE]') {
         doneSent = true;
-        port.postMessage({ type: 'done' });
+        safePostMessage({ type: 'done' });
         return;
       }
       try {
@@ -1057,11 +1095,11 @@ async function handleInlineTranslate(payload: InlineTranslatePayload, port: chro
           ? parseOpenAIStreamPayload(parsed)
           : parseAnthropicStreamPayload(parsed);
         if (result.delta) {
-          port.postMessage({ type: 'delta', data: result.delta });
+          safePostMessage({ type: 'delta', data: result.delta });
         }
         if (result.done) {
           doneSent = true;
-          port.postMessage({ type: 'done' });
+          safePostMessage({ type: 'done' });
           return;
         }
       } catch (error) {
@@ -1070,13 +1108,13 @@ async function handleInlineTranslate(payload: InlineTranslatePayload, port: chro
     }
   } catch (error) {
     if ((error as Error).name !== 'AbortError') {
-      port.postMessage({ type: 'error', error: (error as Error).message || String(error) });
+      safePostMessage({ type: 'error', error: (error as Error).message || String(error) });
     }
   } finally {
     clearTimeout(timeoutId);
     port.onDisconnect.removeListener(onDisconnect);
     if (!doneSent) {
-      port.postMessage({ type: 'done' });
+      safePostMessage({ type: 'done' });
     }
   }
 }
@@ -1085,16 +1123,30 @@ async function handleInlineTranslateBatch(payload: InlineTranslateBatchPayload, 
   const { streamFormat, endpoint, headers, requestBody } = await buildInlineTranslateBatchRequestConfig(payload);
 
   const controller = new AbortController();
-  const timeoutId = setTimeout(() => {
-    controller.abort();
-    port.postMessage({ type: 'error', error: 'Request timeout (45s)' });
-  }, 45000); // Longer timeout for batch
+  let timeoutId: number;
+
+  let isDisconnected = false;
+  const safePostMessage = (msg: any) => {
+    if (!isDisconnected) {
+      try {
+        port.postMessage(msg);
+      } catch (e) {
+        console.warn('[Inline Translate Batch] Safe postMessage failed:', e);
+      }
+    }
+  };
 
   const onDisconnect = () => {
-    clearTimeout(timeoutId);
+    isDisconnected = true;
+    if (timeoutId) clearTimeout(timeoutId);
     controller.abort();
   };
   port.onDisconnect.addListener(onDisconnect);
+
+  timeoutId = setTimeout(() => {
+    controller.abort();
+    safePostMessage({ type: 'error', error: 'Request timeout (45s)' });
+  }, 45000) as any; // Longer timeout for batch
 
   let doneSent = false;
 
@@ -1128,7 +1180,7 @@ async function handleInlineTranslateBatch(payload: InlineTranslateBatchPayload, 
         const data = trimmed.slice(5).trim();
         if (data === '[DONE]') {
           doneSent = true;
-          port.postMessage({ type: 'done' });
+          safePostMessage({ type: 'done' });
           return;
         }
         try {
@@ -1136,10 +1188,10 @@ async function handleInlineTranslateBatch(payload: InlineTranslateBatchPayload, 
           const result = streamFormat === 'openai'
             ? parseOpenAIStreamPayload(parsed)
             : parseAnthropicStreamPayload(parsed);
-          if (result.delta) port.postMessage({ type: 'delta', data: result.delta });
+          if (result.delta) safePostMessage({ type: 'delta', data: result.delta });
           if (result.done) {
             doneSent = true;
-            port.postMessage({ type: 'done' });
+            safePostMessage({ type: 'done' });
             return;
           }
         } catch { }
@@ -1151,7 +1203,7 @@ async function handleInlineTranslateBatch(payload: InlineTranslateBatchPayload, 
       const data = remaining.slice(5).trim();
       if (data === '[DONE]') {
         doneSent = true;
-        port.postMessage({ type: 'done' });
+        safePostMessage({ type: 'done' });
         return;
       }
       try {
@@ -1159,21 +1211,21 @@ async function handleInlineTranslateBatch(payload: InlineTranslateBatchPayload, 
         const result = streamFormat === 'openai'
           ? parseOpenAIStreamPayload(parsed)
           : parseAnthropicStreamPayload(parsed);
-        if (result.delta) port.postMessage({ type: 'delta', data: result.delta });
+        if (result.delta) safePostMessage({ type: 'delta', data: result.delta });
         if (result.done) {
           doneSent = true;
-          port.postMessage({ type: 'done' });
+          safePostMessage({ type: 'done' });
           return;
         }
       } catch { }
     }
   } catch (error) {
     if ((error as Error).name !== 'AbortError') {
-      port.postMessage({ type: 'error', error: (error as Error).message || String(error) });
+      safePostMessage({ type: 'error', error: (error as Error).message || String(error) });
     }
   } finally {
     clearTimeout(timeoutId);
     port.onDisconnect.removeListener(onDisconnect);
-    if (!doneSent) port.postMessage({ type: 'done' });
+    if (!doneSent) safePostMessage({ type: 'done' });
   }
 }
