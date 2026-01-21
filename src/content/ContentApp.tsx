@@ -21,6 +21,7 @@ const ContentApp: React.FC = () => {
   const [lang, setLang] = useState<'zh' | 'en'>('zh');
   const [targetLang, setTargetLang] = useState('中文');
   const [isTextExpanded, setIsTextExpanded] = useState(false);
+  const [contextMaxTokens, setContextMaxTokens] = useState(2000);
 
   const clampValue = (value: number, min: number, max: number) => Math.min(Math.max(value, min), max);
 
@@ -117,16 +118,17 @@ const ContentApp: React.FC = () => {
     openai: 'gpt-4o',
   };
 
-  // Load provider, model name, and output language
+  // Load provider, model name, output language, and context settings
   useEffect(() => {
     const getProviderConfig = async () => {
-      const result = await chrome.storage.local.get(['selectedProvider', 'targetLanguage', 'kanaRubyEnabled']);
+      const result = await chrome.storage.local.get(['selectedProvider', 'targetLanguage', 'kanaRubyEnabled', 'contextMaxTokens']);
       const providerValue = (result.selectedProvider as Provider) || 'deepseek';
       const modelKey = `${providerValue}Model`;
       const modelResult = await chrome.storage.local.get([modelKey]);
       setModelName((modelResult[modelKey] as string) || defaultModels[providerValue]);
       setTargetLang((result.targetLanguage as string) || '中文');
       setKanaRubyEnabled(result.kanaRubyEnabled !== false);
+      setContextMaxTokens((result.contextMaxTokens as number) || 2000);
     };
     getProviderConfig();
 
@@ -136,6 +138,9 @@ const ContentApp: React.FC = () => {
       }
       if (changes.kanaRubyEnabled) {
         setKanaRubyEnabled(changes.kanaRubyEnabled.newValue !== false);
+      }
+      if (changes.contextMaxTokens) {
+        setContextMaxTokens((changes.contextMaxTokens.newValue as number) || 2000);
       }
       if (changes.selectedProvider) {
         const providerValue = (changes.selectedProvider.newValue as Provider) || 'deepseek';
@@ -420,7 +425,7 @@ const ContentApp: React.FC = () => {
     disconnectKanaStreamPort();
 
     const sel = window.getSelection();
-    const context = sel ? ContextExtractor.getContext(sel) : '';
+    const context = sel ? ContextExtractor.getContext(sel, contextMaxTokens) : '';
     const pageUrl = window.location.href;
     const pageTitle = document.title;
     setLastLocalContext(getLocalContextFromSelection(sel));

@@ -94,9 +94,9 @@ function normalizeOpenAIEndpoint(baseUrl: string): string {
 }
 
 // Maximum context length sent to API (in characters)
-const DEFAULT_CONTEXT_MAX_TOKENS = 1000;
+const DEFAULT_CONTEXT_MAX_TOKENS = 2000;
 const MIN_CONTEXT_MAX_TOKENS = 200;
-const MAX_CONTEXT_MAX_TOKENS = 5000;
+const MAX_CONTEXT_MAX_TOKENS = 10000;
 
 // Optimization 1: Config cache - avoid reading storage on every request
 let cachedProviderConfig: {

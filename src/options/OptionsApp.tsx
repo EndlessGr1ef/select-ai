@@ -102,7 +102,7 @@ const OptionsApp: React.FC = () => {
   const [blacklistEnabled, setBlacklistEnabled] = useState(true);
   const [translationButtonEnabled, setTranslationButtonEnabled] = useState(true);
   const [kanaRubyEnabled, setKanaRubyEnabled] = useState(true);
-  const [contextMaxTokens, setContextMaxTokens] = useState(1000);
+  const [contextMaxTokens, setContextMaxTokens] = useState(2000);
 
   useEffect(() => {
     setLang(getUILanguage());
@@ -115,7 +115,7 @@ const OptionsApp: React.FC = () => {
       setBlacklistEnabled(result.translationBlacklistEnabled !== false);
       setTranslationButtonEnabled(result.translationButtonEnabled !== false);
       setKanaRubyEnabled(result.kanaRubyEnabled !== false);
-      setContextMaxTokens((result.contextMaxTokens as number) || 1000);
+      setContextMaxTokens((result.contextMaxTokens as number) || 2000);
 
       setIsLoading(false);
     });
@@ -598,11 +598,16 @@ const OptionsApp: React.FC = () => {
                 <div style={{ marginTop: 20 }}>
                   <label style={labelStyle}>{t.contextMaxTokensLabel[lang]}</label>
                   <input
-                    type="number"
-                    min={200}
-                    max={6000}
+                    type="text"
                     value={contextMaxTokens}
-                    onChange={(e) => setContextMaxTokens(Math.max(200, Math.min(6000, parseInt(e.target.value) || 200)))}
+                    onChange={(e) => {
+                      const val = parseInt(e.target.value) || 0;
+                      setContextMaxTokens(Math.max(200, Math.min(10000, val)));
+                    }}
+                    onBlur={(e) => {
+                      const val = parseInt(e.target.value) || 200;
+                      setContextMaxTokens(Math.max(200, Math.min(10000, val)));
+                    }}
                     style={inputStyle}
                   />
                   <p style={hintStyle}>{t.contextMaxTokensHint[lang]}</p>
