@@ -241,8 +241,10 @@ async function buildRequestConfig(payload: QueryPayload): Promise<RequestConfig>
 2. 直接给出解释内容，不要重复或引用原文;
 3. 保持回答内容精炼,不要冗长啰嗦;
 4. 必须严格按以下格式输出回答内容;
-   基础含义:xxx
-   上下文中的含义:xxx
+   基础含义:
+   xxx
+   上下文中的含义:
+   xxx
 5. 请以陈述句回答, 回答内容尽量限制在1000字符以内;
 6. 用中文回答,按markdown格式美化输出;
 7. 禁止使用代码块、内联代码或HTML标签(例如: \`\`\`、\`code\`、<tag>，但source_lang标签除外)`
@@ -254,8 +256,10 @@ async function buildRequestConfig(payload: QueryPayload): Promise<RequestConfig>
 2. Provide the explanation directly without repeating or quoting the original text;
 3. Keep your response content concise, avoid verbosity;
 4. You MUST output in the following format only, nothing else:
-   Base meaning: xxx;
-   Contextual meaning: xxx;
+   Base meaning: 
+   xxx;
+   Contextual meaning: 
+   xxx;
 5. Answer in a declarative sentence, the response content should be less than 1000 characters;
 6. Respond in ${targetLang}, beautify the output in markdown format;
 7. Do not use code blocks, inline code, or HTML tags (e.g., \`\`\` or \`code\` or <tag>, except source_lang tag)`;
