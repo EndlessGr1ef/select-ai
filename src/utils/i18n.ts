@@ -37,6 +37,8 @@ export const translations = {
     modelLabel: { zh: '模型标识', en: 'Model' },
     modelCustomHint: { zh: '可为该提供商自定义模型名称。', en: 'You can customize the model name for this provider.' },
     targetLangLabel: { zh: '输出语言', en: 'Output Language' },
+    contextMaxTokensLabel: { zh: 'max_tokens (上下文长度)', en: 'max_tokens (Context length)' },
+    contextMaxTokensHint: { zh: '仅用于划词解释，控制发送的上下文长度（建议 500-3000）', en: 'For selection explanation only, controls context length sent (recommended 500-3000)' },
     saveBtn: { zh: '保存配置', en: 'Save Configuration' },
     saveSuccess: { zh: '✓ 配置已保存', en: '✓ Configuration saved' },
     guideTitle: { zh: '📖 使用指南', en: '📖 User Guide' },

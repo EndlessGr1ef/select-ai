@@ -102,10 +102,11 @@ const OptionsApp: React.FC = () => {
   const [blacklistEnabled, setBlacklistEnabled] = useState(true);
   const [translationButtonEnabled, setTranslationButtonEnabled] = useState(true);
   const [kanaRubyEnabled, setKanaRubyEnabled] = useState(true);
+  const [contextMaxTokens, setContextMaxTokens] = useState(1000);
 
   useEffect(() => {
     setLang(getUILanguage());
-    chrome.storage.local.get(['selectedProvider', 'targetLanguage', 'translationConcurrency', 'translationBlacklistEnabled', 'translationButtonEnabled', 'kanaRubyEnabled'], (result) => {
+    chrome.storage.local.get(['selectedProvider', 'targetLanguage', 'translationConcurrency', 'translationBlacklistEnabled', 'translationButtonEnabled', 'kanaRubyEnabled', 'contextMaxTokens'], (result) => {
       if (result.selectedProvider) {
         setProvider(result.selectedProvider as Provider);
       }
@@ -114,6 +115,7 @@ const OptionsApp: React.FC = () => {
       setBlacklistEnabled(result.translationBlacklistEnabled !== false);
       setTranslationButtonEnabled(result.translationButtonEnabled !== false);
       setKanaRubyEnabled(result.kanaRubyEnabled !== false);
+      setContextMaxTokens((result.contextMaxTokens as number) || 1000);
 
       setIsLoading(false);
     });
@@ -132,7 +134,7 @@ const OptionsApp: React.FC = () => {
     });
   }, [provider]);
 
-  const t = translations.options as typeof translations.options & { rakutenName: { zh: string; en: string } };
+  const t = translations.options as typeof translations.options;
   const modelOptions = PROVIDER_MODEL_OPTIONS[provider] || [];
 
   const handleSave = () => {
@@ -146,7 +148,8 @@ const OptionsApp: React.FC = () => {
       translationConcurrency: concurrency,
       translationBlacklistEnabled: blacklistEnabled,
       translationButtonEnabled,
-      kanaRubyEnabled
+      kanaRubyEnabled,
+      contextMaxTokens
     }, () => {
       setStatus({ type: 'success', message: t.saveSuccess[lang] });
       setTimeout(() => setStatus({ type: 'idle', message: '' }), 3000);
@@ -590,6 +593,19 @@ const OptionsApp: React.FC = () => {
                       <option value="한국어">🇰🇷 한국어</option>
                     </select>
                   </div>
+                </div>
+
+                <div style={{ marginTop: 20 }}>
+                  <label style={labelStyle}>{t.contextMaxTokensLabel[lang]}</label>
+                  <input
+                    type="number"
+                    min={200}
+                    max={6000}
+                    value={contextMaxTokens}
+                    onChange={(e) => setContextMaxTokens(Math.max(200, Math.min(6000, parseInt(e.target.value) || 200)))}
+                    style={inputStyle}
+                  />
+                  <p style={hintStyle}>{t.contextMaxTokensHint[lang]}</p>
                 </div>
               </div>
             </React.Fragment>

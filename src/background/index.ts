@@ -94,7 +94,9 @@ function normalizeOpenAIEndpoint(baseUrl: string): string {
 }
 
 // Maximum context length sent to API (in characters)
-const MAX_CONTEXT_FOR_API = 2000;
+const DEFAULT_CONTEXT_MAX_TOKENS = 1000;
+const MIN_CONTEXT_MAX_TOKENS = 200;
+const MAX_CONTEXT_MAX_TOKENS = 5000;
 
 // Optimization 1: Config cache - avoid reading storage on every request
 let cachedProviderConfig: {
@@ -103,12 +105,18 @@ let cachedProviderConfig: {
   baseUrl: string;
   model: string;
   targetLang: string;
+  contextMaxTokens: number;
 } | null = null;
 
 const DEFAULT_TRANSLATION_CONCURRENCY = 10;
 const MIN_TRANSLATION_CONCURRENCY = 1;
 const MAX_TRANSLATION_CONCURRENCY = 20;
 let cachedTranslationConcurrency: number | null = null;
+
+function clampContextMaxTokens(value: number): number {
+  if (!Number.isFinite(value)) return DEFAULT_CONTEXT_MAX_TOKENS;
+  return Math.max(MIN_CONTEXT_MAX_TOKENS, Math.min(MAX_CONTEXT_MAX_TOKENS, value));
+}
 
 async function getCachedProviderConfig() {
   if (cachedProviderConfig) return cachedProviderConfig;
@@ -123,16 +131,21 @@ async function getCachedProviderConfig() {
     `${storageKey}ApiKey`,
     `${storageKey}BaseUrl`,
     `${storageKey}Model`,
-    'targetLanguage'
+    'targetLanguage',
+    'contextMaxTokens'
   ];
   const providerSettings = await chrome.storage.local.get(allKeys);
+
+  const rawContextMaxTokens = providerSettings.contextMaxTokens as number | undefined;
+  const contextMaxTokens = clampContextMaxTokens(Number(rawContextMaxTokens));
 
   cachedProviderConfig = {
     provider,
     apiKey: providerSettings[`${storageKey}ApiKey`] as string,
     baseUrl: (providerSettings[`${storageKey}BaseUrl`] as string) || config.defaultBaseUrl,
     model: (providerSettings[`${storageKey}Model`] as string) || config.defaultModel,
-    targetLang: (providerSettings.targetLanguage as string) || (isBrowserChinese() ? '中文' : 'English')
+    targetLang: (providerSettings.targetLanguage as string) || (isBrowserChinese() ? '中文' : 'English'),
+    contextMaxTokens
   };
 
   return cachedProviderConfig;
@@ -145,7 +158,7 @@ chrome.storage.onChanged.addListener((changes) => {
     'minimaxApiKey', 'minimaxBaseUrl', 'minimaxModel',
     'deepseekApiKey', 'deepseekBaseUrl', 'deepseekModel',
     'glmApiKey', 'glmBaseUrl', 'glmModel',
-    'targetLanguage'];
+    'targetLanguage', 'contextMaxTokens'];
 
   for (const key of relevantKeys) {
     if (changes[key]) {
@@ -156,6 +169,9 @@ chrome.storage.onChanged.addListener((changes) => {
 
   if (changes.translationConcurrency) {
     cachedTranslationConcurrency = null;
+  }
+  if (changes.contextMaxTokens) {
+    cachedProviderConfig = null;
   }
 });
 
@@ -202,6 +218,7 @@ async function buildRequestConfig(payload: QueryPayload): Promise<RequestConfig>
   const baseUrl = cachedConfig.baseUrl;
   const model = cachedConfig.model;
   const targetLang = cachedConfig.targetLang || payload.targetLang || '中文';
+  const contextMaxTokens = cachedConfig.contextMaxTokens || DEFAULT_CONTEXT_MAX_TOKENS;
 
   const isChineseUI = payload.uiLang ? payload.uiLang === 'zh' : payload.targetLang !== 'en';
 
@@ -210,44 +227,42 @@ async function buildRequestConfig(payload: QueryPayload): Promise<RequestConfig>
   }
 
   // Prepare context (truncate if needed)
-  const contextForApi = payload.context.length > MAX_CONTEXT_FOR_API
-    ? payload.context.substring(0, MAX_CONTEXT_FOR_API) + '...'
+  const contextForApi = payload.context.length > contextMaxTokens
+    ? payload.context.substring(0, contextMaxTokens) + '...'
     : payload.context;
 
   const isChineseTarget = targetLang.startsWith('中文') || targetLang.toLowerCase().startsWith('zh');
 
   const systemPrompt = isChineseTarget
-    ? `你是一个极简解释助手。用户在浏览网页时选中了一段文字进行查询。请结合提供的页面信息和上下文内容，对选中的文字进行精准、简练的解释和翻译。
+    ? `你是一个浏览器划词解释助手。请根据用户选中的内容，结合上下文,对选中的文字进行精准、简练的解释和翻译。
 
 【必须遵守的规则】
 1. 直接给出解释内容，不要重复或引用原文;
-2. 保持回答简洁，不要冗长;
-3. 必须严格按以下格式输出回复;
+2. 保持回答内容精炼,不要冗长啰嗦;
+3. 必须严格按以下格式输出回答内容;
    基础含义:xxx
    上下文中的含义:xxx
-4. 请以陈述句回答, 回答内容限制在1000tokens以内;
+4. 请以陈述句回答, 回答内容尽量限制在1000字符以内;
 5. 用中文回答,按markdown格式美化输出;
 6. 禁止使用代码块、内联代码或HTML标签(例如: \`\`\`、\`code\`、<tag>)`
-    : `You are a concise explanation assistant. The user has selected text while browsing a webpage. Based on the page information and context provided, give a precise and concise explanation or translation of the selected text.
+    : 
+    `You are a browser selection explanation assistant. Please explain the selected text based on the context, give a precise and concise explanation.
 
 【Must follow rules】
 1. Provide the explanation directly without repeating or quoting the original text;
-2. Keep your response concise, avoid verbosity;
+2. Keep your response content concise, avoid verbosity;
 3. You MUST output in the following format only, nothing else:
    Base meaning: xxx;
    Contextual meaning: xxx;
-4. Answer in a declarative sentence, the response content should be less than 1000 tokens;
+4. Answer in a declarative sentence, the response content should be less than 1000 characters;
 5. Respond in ${targetLang}, beautify the output in markdown format;
 6. Do not use code blocks, inline code, or HTML tags (e.g., \`\`\` or \`code\` or <tag>)`;
 
-  const userPrompt = `<page>
+  const userPrompt = `
 <url>${payload.pageUrl || 'unknown'}</url>
 <title>${payload.pageTitle || 'unknown'}</title>
-</page>
 <context>${contextForApi}</context>
-<selection>${payload.selection}</selection>
-
-${isChineseTarget ? '请解释上面选中的内容。' : 'Please explain the selected text above.'}`;
+<selection>${payload.selection}</selection>`;
 
   const apiConfig = API_CONFIGS[provider];
   const endpoint = provider === 'openai'
