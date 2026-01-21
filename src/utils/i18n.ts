@@ -41,6 +41,11 @@ export const translations = {
     contextMaxTokensHint: { zh: '仅用于划词解释，控制发送的上下文长度（建议 1000-5000）', en: 'For selection explanation only, controls context length sent (recommended 1000-5000)' },
     saveBtn: { zh: '保存配置', en: 'Save Configuration' },
     saveSuccess: { zh: '✓ 配置已保存', en: '✓ Configuration saved' },
+    testBtn: { zh: '测试连接', en: 'Test Connection' },
+    testing: { zh: '正在测试...', en: 'Testing...' },
+    testSuccess: { zh: '连接成功 (OK)', en: 'Connection Success (OK)' },
+    testFailed: { zh: '连接失败', en: 'Connection Failed' },
+    securityPromise: { zh: '您的 Key 仅存储在本地浏览器中，绝不会上传至任何服务器。', en: 'Your API Key is stored only in your local browser and will never be uploaded to any server.' },
     guideTitle: { zh: '📖 使用指南', en: '📖 User Guide' },
     guideSteps: {
       zh: ['在网页上划选任意文字', '点击出现的粉紫色小圆点', 'AI 将自动分析上下文并给出解释或翻译'],

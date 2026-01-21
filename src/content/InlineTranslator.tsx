@@ -249,6 +249,8 @@ const InlineTranslatorInner: React.FC<{ blacklist: SiteBlacklist }> = ({ blackli
     if (isSameLang) {
       const container = document.getElementById(id);
       if (container) container.remove();
+      element.removeAttribute('data-select-ai-translated');
+      element.removeAttribute('data-select-ai-inline-mode');
       return;
     }
 

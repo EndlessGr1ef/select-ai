@@ -234,22 +234,22 @@ async function buildRequestConfig(payload: QueryPayload): Promise<RequestConfig>
   const isChineseTarget = targetLang.startsWith('中文') || targetLang.toLowerCase().startsWith('zh');
 
   const systemPrompt = isChineseTarget
-    ? `你是一个浏览器划词解释助手。请根据用户选中的内容，结合上下文,对选中的文字进行精准、简练的解释和翻译。
+    ? `你是一个浏览器划词解释助手。请根据用户选中的内容,结合上下文进行理解,对选中内容进行解释和翻译。
 
 【必须遵守的规则】
-1. 首先输出原文语言标签: <source_lang>xx</source_lang>，xx为语言代码(en/ja/zh/ko/fr/de/es等);
+1. 首先输出原文语言标签: <source_lang>xx</source_lang>,xx为语言代码(en/ja/zh/ko/fr/de/es等);
 2. 直接给出解释内容，不要重复或引用原文;
-3. 保持回答内容精炼,不要冗长啰嗦;
+3. 生成解释时保持回答内容精炼，不要冗长啰嗦;
 4. 必须严格按以下格式输出回答内容;
    基础含义:
    xxx
    上下文中的含义:
    xxx
-5. 请以陈述句回答, 回答内容尽量限制在1000字符以内;
+5. 请以陈述句回答;
 6. 用中文回答,按markdown格式美化输出;
-7. 禁止使用代码块、内联代码或HTML标签(例如: \`\`\`、\`code\`、<tag>，但source_lang标签除外)`
+7. 禁止使用代码块、内联代码或HTML标签(例如: \`\`\`、\`code\`、<tag>,但source_lang标签除外)`
     :
-    `You are a browser selection explanation assistant. Please explain the selected text based on the context, give a precise and concise explanation.
+    `You are a browser selection explanation assistant. Please explain the selected text based on the context and the selected text, give a precise and concise explanation.
 
 【Must follow rules】
 1. First output source language tag: <source_lang>xx</source_lang>, where xx is the language code (en/ja/zh/ko/fr/de/es, etc.);
@@ -260,7 +260,7 @@ async function buildRequestConfig(payload: QueryPayload): Promise<RequestConfig>
    xxx;
    Contextual meaning: 
    xxx;
-5. Answer in a declarative sentence, the response content should be less than 1000 characters;
+5. Answer in a declarative sentence;
 6. Respond in ${targetLang}, beautify the output in markdown format;
 7. Do not use code blocks, inline code, or HTML tags (e.g., \`\`\` or \`code\` or <tag>, except source_lang tag)`;
 
@@ -721,10 +721,14 @@ async function handleKanaStream(payload: KanaPayload, port: chrome.runtime.Port)
 }
 
 chrome.runtime.onConnect.addListener((port) => {
-  if (port.name !== 'ai-stream' && port.name !== 'ai-translate-stream' && port.name !== 'ai-kana-stream') return;
+  if (port.name !== 'ai-stream' && port.name !== 'ai-translate-stream' && port.name !== 'ai-kana-stream' && port.name !== 'ai-test-connection') return;
 
   port.onMessage.addListener((message) => {
-    if (message?.action === 'queryAIStream') {
+    if (message?.action === 'testConnection') {
+      handleTestConnection(message.payload, port).catch((error) => {
+        port.postMessage({ type: 'error', error: error.message || String(error) });
+      });
+    } else if (message?.action === 'queryAIStream') {
       handleAIStream(message.payload as QueryPayload, port).catch((error) => {
         port.postMessage({ type: 'error', error: error.message || String(error) });
       });
@@ -1227,5 +1231,63 @@ async function handleInlineTranslateBatch(payload: InlineTranslateBatchPayload, 
     clearTimeout(timeoutId);
     port.onDisconnect.removeListener(onDisconnect);
     if (!doneSent) safePostMessage({ type: 'done' });
+  }
+}
+
+async function handleTestConnection(payload: any, port: chrome.runtime.Port): Promise<void> {
+  const { provider, apiKey, baseUrl, model, uiLang } = payload;
+  const isChineseUI = uiLang === 'zh';
+
+  if (!apiKey) {
+    throw new Error(isChineseUI ? '请先在设置页面配置 API Key' : 'Please configure API Key in settings');
+  }
+
+  const apiConfig = API_CONFIGS[provider as Provider];
+  const endpoint = provider === 'openai'
+    ? normalizeOpenAIEndpoint(baseUrl)
+    : `${baseUrl}${apiConfig.endpointPath}`;
+
+  const authHeader = apiConfig.authHeader === 'Bearer'
+    ? `Bearer ${apiKey}`
+    : apiKey;
+
+  const headers: Record<string, string> = {
+    'Content-Type': 'application/json',
+    [apiConfig.authHeader === 'Bearer' ? 'Authorization' : 'x-api-key']: authHeader,
+    ...apiConfig.extraHeaders,
+  };
+
+  const streamFormat = getStreamFormat(provider as Provider);
+  const testPrompt = "Ping";
+
+  const requestBody = streamFormat === 'openai'
+    ? {
+      model: model,
+      max_tokens: 5,
+      messages: [{ role: 'user', content: testPrompt }],
+      stream: false
+    }
+    : {
+      model: model,
+      max_tokens: 5,
+      system: "Respond only with OK",
+      messages: [{ role: 'user', content: testPrompt }],
+      stream: false
+    };
+
+  try {
+    const response = await fetch(endpoint, {
+      method: 'POST',
+      headers,
+      body: JSON.stringify(requestBody),
+    });
+
+    if (!response.ok) {
+      throw new Error(await readErrorMessage(response));
+    }
+
+    port.postMessage({ type: 'success' });
+  } catch (error) {
+    port.postMessage({ type: 'error', error: (error as Error).message || String(error) });
   }
 }

@@ -11,7 +11,10 @@ import {
   EyeOff,
   AlertCircle,
   Globe2,
-  CheckCircle2
+  CheckCircle2,
+  ShieldCheck,
+  Zap,
+  Loader2
 } from 'lucide-react';
 import { icons } from '../resource';
 
@@ -103,6 +106,8 @@ const OptionsApp: React.FC = () => {
   const [translationButtonEnabled, setTranslationButtonEnabled] = useState(true);
   const [kanaRubyEnabled, setKanaRubyEnabled] = useState(true);
   const [contextMaxTokens, setContextMaxTokens] = useState(2000);
+  const [isTesting, setIsTesting] = useState(false);
+  const [testStatus, setTestStatus] = useState<{ type: 'success' | 'error' | 'idle', message: string }>({ type: 'idle', message: '' });
 
   useEffect(() => {
     setLang(getUILanguage());
@@ -154,6 +159,54 @@ const OptionsApp: React.FC = () => {
       setStatus({ type: 'success', message: t.saveSuccess[lang] });
       setTimeout(() => setStatus({ type: 'idle', message: '' }), 3000);
     });
+  };
+
+  const handleTestConnection = async () => {
+    if (!apiKey) {
+      setTestStatus({ type: 'error', message: t.apiKeyPlaceholder[lang] });
+      return;
+    }
+
+    setIsTesting(true);
+    setTestStatus({ type: 'idle', message: '' });
+
+    try {
+      // Create a temporary port to test connection
+      const port = chrome.runtime.connect({ name: 'ai-test-connection' });
+
+      const timeoutPromise = new Promise((_, reject) => {
+        setTimeout(() => reject(new Error('Timeout')), 10000);
+      });
+
+      const testPromise = new Promise((resolve, reject) => {
+        port.onMessage.addListener((msg) => {
+          if (msg.type === 'success') resolve(msg);
+          else if (msg.type === 'error') reject(new Error(msg.error));
+        });
+
+        port.onDisconnect.addListener(() => {
+          reject(new Error('Port disconnected'));
+        });
+
+        port.postMessage({
+          action: 'testConnection',
+          payload: {
+            provider,
+            apiKey,
+            baseUrl,
+            model,
+            uiLang: lang
+          }
+        });
+      });
+
+      await Promise.race([testPromise, timeoutPromise]);
+      setTestStatus({ type: 'success', message: t.testSuccess[lang] });
+    } catch (error) {
+      setTestStatus({ type: 'error', message: `${t.testFailed[lang]}: ${(error as Error).message}` });
+    } finally {
+      setIsTesting(false);
+    }
   };
 
   const containerStyle: React.CSSProperties = {
@@ -484,6 +537,22 @@ const OptionsApp: React.FC = () => {
                   {t.apiSection[lang]}
                 </div>
 
+                <div style={{
+                  backgroundColor: '#fff1f2',
+                  border: '1px solid #fecdd3',
+                  borderRadius: 12,
+                  padding: '12px 16px',
+                  marginBottom: 20,
+                  display: 'flex',
+                  alignItems: 'flex-start',
+                  gap: 10,
+                }}>
+                  <ShieldCheck size={18} style={{ color: '#e11d48', marginTop: 2, flexShrink: 0 }} />
+                  <span style={{ fontSize: 13, color: '#9f1239', fontWeight: 500, lineHeight: 1.5 }}>
+                    {t.securityPromise[lang]}
+                  </span>
+                </div>
+
                 <div style={{ marginBottom: 20 }}>
                   <label style={labelStyle}>{t.providerLabel[lang]}</label>
                   <select
@@ -526,6 +595,60 @@ const OptionsApp: React.FC = () => {
                         <Eye size={18} strokeWidth={2} />
                       )}
                     </button>
+                  </div>
+                  <div style={{ marginTop: 12, display: 'flex', alignItems: 'center', gap: 12 }}>
+                    <button
+                      onClick={handleTestConnection}
+                      disabled={isTesting}
+                      style={{
+                        display: 'flex',
+                        alignItems: 'center',
+                        gap: 6,
+                        padding: '8px 16px',
+                        fontSize: 13,
+                        fontWeight: 500,
+                        borderRadius: 8,
+                        border: '1px solid #e2e8f0',
+                        backgroundColor: '#fff',
+                        color: '#475569',
+                        cursor: isTesting ? 'not-allowed' : 'pointer',
+                        transition: 'all 0.2s',
+                        boxShadow: '0 1px 2px rgba(0,0,0,0.05)',
+                      }}
+                      onMouseEnter={(e) => {
+                        if (!isTesting) {
+                          e.currentTarget.style.backgroundColor = '#f8fafc';
+                          e.currentTarget.style.borderColor = '#cbd5e1';
+                        }
+                      }}
+                      onMouseLeave={(e) => {
+                        if (!isTesting) {
+                          e.currentTarget.style.backgroundColor = '#fff';
+                          e.currentTarget.style.borderColor = '#e2e8f0';
+                        }
+                      }}
+                    >
+                      {isTesting ? (
+                        <Loader2 size={16} className="animate-spin" />
+                      ) : (
+                        <Zap size={16} />
+                      )}
+                      {isTesting ? t.testing[lang] : t.testBtn[lang]}
+                    </button>
+
+                    {testStatus.type !== 'idle' && (
+                      <div style={{
+                        fontSize: 13,
+                        fontWeight: 500,
+                        color: testStatus.type === 'success' ? '#059669' : '#dc2626',
+                        display: 'flex',
+                        alignItems: 'center',
+                        gap: 4
+                      }}>
+                        {testStatus.type === 'success' ? <CheckCircle2 size={14} /> : <AlertCircle size={14} />}
+                        {testStatus.message}
+                      </div>
+                    )}
                   </div>
                 </div>
 
@@ -714,7 +837,7 @@ const OptionsApp: React.FC = () => {
           </div>
         </div>
       </div>
-    </div>
+    </div >
   );
 };
 

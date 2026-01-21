@@ -16,7 +16,6 @@ const ContentApp: React.FC = () => {
   const [kanaText, setKanaText] = useState('');
   const [kanaLoading, setKanaLoading] = useState(false);
   const [kanaRubyEnabled, setKanaRubyEnabled] = useState(true);
-  const [lastLocalContext, setLastLocalContext] = useState('');
   const [modelName, setModelName] = useState('gpt-4o');
   const [lang, setLang] = useState<'zh' | 'en'>('zh');
   const [targetLang, setTargetLang] = useState('中文');
@@ -343,21 +342,21 @@ const ContentApp: React.FC = () => {
   }, [isResizing, resizeDirection]);
 
   useEffect(() => {
-    const selectionIdleDelay = 300;
+    const selectionIdleDelay = 400;
 
     const updateFromSelection = () => {
       if (isResizing || isDragging) return;
       const sel = window.getSelection();
       if (!sel || sel.rangeCount === 0) {
         setShowDot(false);
-        if (!loading) setShowPanel(false);
+        if (!loading && !showPanelRef.current) setShowPanel(false);
         return;
       }
 
       const text = sel.toString().trim();
       if (!text) {
         setShowDot(false);
-        if (!loading) setShowPanel(false);
+        if (!loading && !showPanelRef.current) setShowPanel(false);
         return;
       }
 
@@ -388,7 +387,7 @@ const ContentApp: React.FC = () => {
             y: lastPointerRef.current.y + window.scrollY,
           });
           setShowDot(true);
-          setShowPanel(false);
+          if (!showPanelRef.current) setShowPanel(false);
         }
         return;
       }
@@ -399,7 +398,7 @@ const ContentApp: React.FC = () => {
         y: rect.top + window.scrollY,
       });
       setShowDot(true);
-      setShowPanel(false);
+      if (!showPanelRef.current) setShowPanel(false);
     };
 
     const scheduleSelectionUpdate = () => {
@@ -454,7 +453,6 @@ const ContentApp: React.FC = () => {
     const context = sel ? ContextExtractor.getContext(sel, contextMaxTokens) : '';
     const pageUrl = window.location.href;
     const pageTitle = document.title;
-    setLastLocalContext(getLocalContextFromSelection(sel));
 
     if (!chrome.runtime?.id) {
       setLoading(false);
@@ -828,19 +826,24 @@ const ContentApp: React.FC = () => {
   // Parse XML response from AI and format for display
   const parseXmlResponse = (text: string, uiLang: 'zh' | 'en'): string => {
     // Remove source_lang tag first (used for TTS, not displayed)
-    const cleanedText = text.replace(/<source_lang>[^<]*<\/source_lang>\s*/gi, '');
+    const cleanedText = text.replace(/<source_lang>[\s\S]*?(?:<\/source_lang>|$)/gi, '').trim();
 
-    const baseMatch = cleanedText.match(/<base>([\s\S]*?)<\/base>/);
-    const contextMatch = cleanedText.match(/<context>([\s\S]*?)<\/context>/);
+    // Support streaming for <base> and <context> tags
+    const baseMatch = cleanedText.match(/<base>([\s\S]*?)(?:<\/base>|$)/i);
+    const contextMatch = cleanedText.match(/<context>([\s\S]*?)(?:<\/context>|$)/i);
 
     if (baseMatch || contextMatch) {
       const baseLabel = uiLang === 'zh' ? '基础含义' : 'Base meaning';
       const contextLabel = uiLang === 'zh' ? '上下文含义' : 'Contextual meaning';
 
       let formatted = '';
-      if (baseMatch) formatted += `**${baseLabel}:** ${baseMatch[1].trim()}\n\n`;
-      if (contextMatch) formatted += `**${contextLabel}:** ${contextMatch[1].trim()}`;
-      return formatted;
+      if (baseMatch) {
+        formatted += `**${baseLabel}:** ${baseMatch[1].trim()}\n\n`;
+      }
+      if (contextMatch) {
+        formatted += `**${contextLabel}:** ${contextMatch[1].trim()}`;
+      }
+      return formatted.trim();
     }
     return cleanedText;
   };
@@ -934,7 +937,7 @@ const ContentApp: React.FC = () => {
 
     // Filter voices matching the language
     const langPrefix = langCode.split('-')[0].toLowerCase();
-    const matchingVoices = voices.filter(v => 
+    const matchingVoices = voices.filter(v =>
       v.lang.toLowerCase().startsWith(langPrefix)
     );
 
@@ -953,19 +956,19 @@ const ContentApp: React.FC = () => {
     const scoredVoices = matchingVoices.map(voice => {
       let score = 0;
       const nameLower = voice.name.toLowerCase();
-      
+
       // Check for quality keywords
       for (const keyword of qualityKeywords) {
         if (nameLower.includes(keyword)) {
           score += 10;
         }
       }
-      
+
       // Prefer local voices over remote (often higher quality on modern OS)
       if (voice.localService) {
         score += 5;
       }
-      
+
       // Prefer voices with exact language match
       if (voice.lang.toLowerCase() === langCode.toLowerCase()) {
         score += 3;
@@ -1017,10 +1020,10 @@ const ContentApp: React.FC = () => {
     if (!selection) return;
 
     // Priority: AI-detected language > local detection
-    const langCode = sourceLang 
-      ? mapLangCodeToTTS(sourceLang) 
+    const langCode = sourceLang
+      ? mapLangCodeToTTS(sourceLang)
       : detectLanguageForTTS(selection);
-    
+
     speakWithBestVoice(selection, langCode);
   };
 
@@ -1138,12 +1141,12 @@ const ContentApp: React.FC = () => {
             <div style={selectionContainerStyle}>
               <div style={{ display: 'flex', alignItems: 'flex-start', gap: 8 }}>
                 <div style={{ flex: 1 }}>
-                  {shouldRequestKana(selection, lastLocalContext) && kanaLoading && !kanaText && (
+                  {sourceLang === 'ja' && kanaLoading && !kanaText && (
                     <div style={kanaTextStyle}>
                       {lang === 'zh' ? '平假名生成中...' : 'Generating hiragana...'}
                     </div>
                   )}
-                  {shouldRequestKana(selection, lastLocalContext) && kanaText && (isTextExpanded || selection.length <= 150) ? (
+                  {sourceLang === 'ja' && kanaText && (isTextExpanded || selection.length <= 150) ? (
                     <div
                       className="select-ai-kana"
                       style={selectionTitleStyle}
@@ -1228,7 +1231,7 @@ const ContentApp: React.FC = () => {
                         h3: ({ children }) => <h3 style={{ fontSize: 14, fontWeight: 600, margin: '4px 0 2px' }}>{children}</h3>,
                         a: ({ href, children }) => (
                           <a href={href} target="_blank" rel="noopener noreferrer"
-                             style={{ color: '#3b82f6', textDecoration: 'underline' }}>{children}</a>
+                            style={{ color: '#3b82f6', textDecoration: 'underline' }}>{children}</a>
                         ),
                         blockquote: ({ children }) => (
                           <blockquote style={{
