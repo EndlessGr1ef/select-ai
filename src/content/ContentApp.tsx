@@ -1,7 +1,7 @@
 import React, { useState, useEffect, useRef } from 'react';
 import ReactMarkdown from 'react-markdown';
 import { ContextExtractor } from '../utils/ContextExtractor';
-import { getUILanguage } from '../utils/language';
+import { containsKanji, getUILanguage, isLikelyJapanese } from '../utils/language';
 import { translations } from '../utils/i18n';
 
 type Provider = 'openai' | 'anthropic' | 'minimax' | 'deepseek' | 'glm';
@@ -13,6 +13,10 @@ const ContentApp: React.FC = () => {
   const [showPanel, setShowPanel] = useState(false);
   const [result, setResult] = useState<string>('');
   const [loading, setLoading] = useState(false);
+  const [kanaText, setKanaText] = useState('');
+  const [kanaLoading, setKanaLoading] = useState(false);
+  const [kanaRubyEnabled, setKanaRubyEnabled] = useState(true);
+  const [lastLocalContext, setLastLocalContext] = useState('');
   const [modelName, setModelName] = useState('gpt-4o');
   const [lang, setLang] = useState<'zh' | 'en'>('zh');
   const [targetLang, setTargetLang] = useState('中文');
@@ -76,6 +80,7 @@ const ContentApp: React.FC = () => {
   const selectionVersionRef = useRef(0);
   const lastPointerRef = useRef<{ x: number; y: number } | null>(null);
   const streamPortRef = useRef<chrome.runtime.Port | null>(null);
+  const kanaStreamPortRef = useRef<chrome.runtime.Port | null>(null);
   const autoResizeRafRef = useRef<number | null>(null);
   const panelSizeRef = useRef(panelSize);
   const dragOffsetRef = useRef(dragOffset);
@@ -115,18 +120,22 @@ const ContentApp: React.FC = () => {
   // Load provider, model name, and output language
   useEffect(() => {
     const getProviderConfig = async () => {
-      const result = await chrome.storage.local.get(['selectedProvider', 'targetLanguage']);
+      const result = await chrome.storage.local.get(['selectedProvider', 'targetLanguage', 'kanaRubyEnabled']);
       const providerValue = (result.selectedProvider as Provider) || 'deepseek';
       const modelKey = `${providerValue}Model`;
       const modelResult = await chrome.storage.local.get([modelKey]);
       setModelName((modelResult[modelKey] as string) || defaultModels[providerValue]);
       setTargetLang((result.targetLanguage as string) || '中文');
+      setKanaRubyEnabled(result.kanaRubyEnabled !== false);
     };
     getProviderConfig();
 
     const handleStorageChange = (changes: { [key: string]: chrome.storage.StorageChange }) => {
       if (changes.targetLanguage) {
         setTargetLang((changes.targetLanguage.newValue as string) || '中文');
+      }
+      if (changes.kanaRubyEnabled) {
+        setKanaRubyEnabled(changes.kanaRubyEnabled.newValue !== false);
       }
       if (changes.selectedProvider) {
         const providerValue = (changes.selectedProvider.newValue as Provider) || 'deepseek';
@@ -155,6 +164,35 @@ const ContentApp: React.FC = () => {
       streamPortRef.current.disconnect();
       streamPortRef.current = null;
     }
+  };
+
+  const disconnectKanaStreamPort = () => {
+    if (kanaStreamPortRef.current) {
+      kanaStreamPortRef.current.disconnect();
+      kanaStreamPortRef.current = null;
+    }
+  };
+
+  const shouldRequestKana = (text: string, contextText: string): boolean => {
+    return kanaRubyEnabled && containsKanji(text) && isLikelyJapanese(contextText || text);
+  };
+
+  const getLocalContextFromSelection = (sel: Selection | null, maxChars = 300): string => {
+    if (!sel || sel.rangeCount === 0) return selection;
+    const range = sel.getRangeAt(0);
+    const container = range.commonAncestorContainer;
+    const element = container.nodeType === Node.ELEMENT_NODE
+      ? (container as Element)
+      : container.parentElement;
+    const text = element?.textContent?.trim() || selection;
+    if (!text) return selection;
+    const normalizedSelection = selection.trim();
+    if (!normalizedSelection) return text.slice(0, maxChars);
+    const index = text.indexOf(normalizedSelection);
+    if (index === -1) return text.slice(0, maxChars);
+    const start = Math.max(0, index - Math.floor(maxChars / 2));
+    const end = Math.min(text.length, index + normalizedSelection.length + Math.floor(maxChars / 2));
+    return text.slice(start, end);
   };
 
   // Drag handlers for panel repositioning
@@ -373,15 +411,19 @@ const ContentApp: React.FC = () => {
     setShowPanel(true);
     setLoading(true);
     setResult('');
+    setKanaText('');
+    setKanaLoading(false);
     setIsTextExpanded(false);
     setDragOffset({ x: 0, y: 0 });
     setPanelSize(getDefaultPanelSize());
     setIsUserSized(false);
+    disconnectKanaStreamPort();
 
     const sel = window.getSelection();
     const context = sel ? ContextExtractor.getContext(sel) : '';
     const pageUrl = window.location.href;
     const pageTitle = document.title;
+    setLastLocalContext(getLocalContextFromSelection(sel));
 
     if (!chrome.runtime?.id) {
       setLoading(false);
@@ -414,6 +456,31 @@ const ContentApp: React.FC = () => {
       });
 
       port.postMessage({ action: 'queryAIStream', payload });
+
+      if (shouldRequestKana(selection, getLocalContextFromSelection(sel))) {
+        setKanaLoading(true);
+        const kanaPort = chrome.runtime.connect({ name: 'ai-kana-stream' });
+        kanaStreamPortRef.current = kanaPort;
+
+        kanaPort.onMessage.addListener((message) => {
+          if (message?.type === 'delta') {
+            setKanaText((prev) => prev + (message.data || ''));
+            setKanaLoading(false);
+          } else if (message?.type === 'done') {
+            setKanaLoading(false);
+          } else if (message?.type === 'error') {
+            setKanaLoading(false);
+            console.error('[AI Search] Kana stream error:', message.error || 'Streaming error');
+          }
+        });
+
+        kanaPort.onDisconnect.addListener(() => {
+          kanaStreamPortRef.current = null;
+          setKanaLoading(false);
+        });
+
+        kanaPort.postMessage({ action: 'queryKana', payload: { text: selection, uiLang: lang } });
+      }
       return;
     } catch (e) {
       console.error('[AI Search] Send failed:', e);
@@ -430,7 +497,9 @@ const ContentApp: React.FC = () => {
   useEffect(() => {
     if (!showPanel) {
       disconnectStreamPort();
+      disconnectKanaStreamPort();
       setLoading(false);
+      setKanaLoading(false);
       setIsUserSized(false);
     }
   }, [showPanel]);
@@ -503,6 +572,7 @@ const ContentApp: React.FC = () => {
   useEffect(() => {
     return () => {
       disconnectStreamPort();
+      disconnectKanaStreamPort();
     };
   }, []);
 
@@ -600,6 +670,14 @@ const ContentApp: React.FC = () => {
     lineHeight: 1.5,
   };
 
+  const kanaTextStyle: React.CSSProperties = {
+    fontSize: 12,
+    color: '#6b7280',
+    marginBottom: 6,
+    lineHeight: 1.4,
+    whiteSpace: 'pre-wrap',
+  };
+
   const selectionContainerStyle: React.CSSProperties = {
     padding: 12,
     marginBottom: 12,
@@ -675,6 +753,42 @@ const ContentApp: React.FC = () => {
   const cornerSize = 12;
   const edgeSize = 6;
 
+  const escapeHtml = (value: string): string => {
+    return value
+      .replace(/&/g, '&amp;')
+      .replace(/</g, '&lt;')
+      .replace(/>/g, '&gt;');
+  };
+
+  const sanitizeRubyMarkup = (value: string): string => {
+    try {
+      const parser = new DOMParser();
+      const doc = parser.parseFromString(`<div>${value}</div>`, 'text/html');
+      const container = doc.body.firstChild;
+      if (!container) return escapeHtml(value);
+
+      const allowedTags = new Set(['RUBY', 'RT', 'RP']);
+      const build = (node: ChildNode): string => {
+        if (node.nodeType === Node.TEXT_NODE) {
+          return escapeHtml(node.textContent || '');
+        }
+        if (node.nodeType !== Node.ELEMENT_NODE) return '';
+        const element = node as HTMLElement;
+        const tagName = element.tagName;
+        const inner = Array.from(element.childNodes).map(build).join('');
+        if (!allowedTags.has(tagName)) {
+          return inner;
+        }
+        const lowerTag = tagName.toLowerCase();
+        return `<${lowerTag}>${inner}</${lowerTag}>`;
+      };
+
+      return Array.from(container.childNodes).map(build).join('');
+    } catch {
+      return escapeHtml(value);
+    }
+  };
+
   // Parse XML response from AI and format for display
   const parseXmlResponse = (text: string, uiLang: 'zh' | 'en'): string => {
     const baseMatch = text.match(/<base>([\s\S]*?)<\/base>/);
@@ -738,6 +852,16 @@ const ContentApp: React.FC = () => {
         @keyframes spin {
           from { transform: rotate(0deg); }
           to { transform: rotate(360deg); }
+        }
+
+        .select-ai-kana ruby {
+          ruby-position: over;
+          ruby-align: center;
+        }
+
+        .select-ai-kana rt {
+          font-size: 0.7em;
+          color: #9ca3af;
         }
       `}</style>
 
@@ -827,11 +951,24 @@ const ContentApp: React.FC = () => {
 
           <div style={contentStyle}>
             <div style={selectionContainerStyle}>
-              <div style={selectionTitleStyle}>
-                {selection.length > 150 && !isTextExpanded
-                  ? selection.substring(0, 120) + '...'
-                  : selection}
-              </div>
+              {shouldRequestKana(selection, lastLocalContext) && kanaLoading && !kanaText && (
+                <div style={kanaTextStyle}>
+                  {lang === 'zh' ? '平假名生成中...' : 'Generating hiragana...'}
+                </div>
+              )}
+              {shouldRequestKana(selection, lastLocalContext) && kanaText && (isTextExpanded || selection.length <= 150) ? (
+                <div
+                  className="select-ai-kana"
+                  style={selectionTitleStyle}
+                  dangerouslySetInnerHTML={{ __html: sanitizeRubyMarkup(kanaText) }}
+                />
+              ) : (
+                <div style={selectionTitleStyle}>
+                  {selection.length > 150 && !isTextExpanded
+                    ? selection.substring(0, 120) + '...'
+                    : selection}
+                </div>
+              )}
               {selection.length > 150 && (
                 <button
                   style={toggleButtonStyle}

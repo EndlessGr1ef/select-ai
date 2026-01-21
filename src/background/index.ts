@@ -170,6 +170,11 @@ type QueryPayload = {
   uiLang?: 'zh' | 'en';
 };
 
+type KanaPayload = {
+  text: string;
+  uiLang?: 'zh' | 'en';
+};
+
 type RequestConfig = {
   provider: Provider;
   streamFormat: StreamFormat;
@@ -253,6 +258,88 @@ ${isChineseTarget ? '请解释上面选中的内容。' : 'Please explain the se
     : apiKey;
 
   // OpenAI-compatible providers require system inside messages
+  const streamFormat = getStreamFormat(provider);
+  const requestBody = streamFormat === 'openai'
+    ? {
+      model: model,
+      max_tokens: 1024,
+      temperature: 0.1,
+      messages: [
+        { role: 'system', content: systemPrompt },
+        { role: 'user', content: userPrompt }
+      ],
+      stream: true
+    }
+    : {
+      model: model,
+      max_tokens: 1024,
+      temperature: 0.1,
+      system: systemPrompt,
+      messages: [
+        { role: 'user', content: userPrompt }
+      ],
+      stream: true
+    };
+
+  const headers: Record<string, string> = {
+    'Content-Type': 'application/json',
+    [apiConfig.authHeader === 'Bearer' ? 'Authorization' : 'x-api-key']: authHeader,
+    ...apiConfig.extraHeaders,
+  };
+
+  return {
+    provider,
+    streamFormat,
+    endpoint,
+    headers,
+    requestBody,
+    isChineseUI
+  };
+}
+
+type KanaRequestConfig = {
+  provider: Provider;
+  streamFormat: StreamFormat;
+  endpoint: string;
+  headers: Record<string, string>;
+  requestBody: Record<string, unknown>;
+  isChineseUI: boolean;
+};
+
+async function buildKanaRequestConfig(payload: KanaPayload): Promise<KanaRequestConfig> {
+  const cachedConfig = await getCachedProviderConfig();
+
+  const provider = cachedConfig.provider;
+  const apiKey = cachedConfig.apiKey;
+  const baseUrl = cachedConfig.baseUrl;
+  const model = cachedConfig.model;
+  const isChineseUI = payload.uiLang ? payload.uiLang === 'zh' : true;
+
+  if (!apiKey) {
+    throw new Error(isChineseUI ? '请先在设置页面配置 API Key' : 'Please configure API Key in settings');
+  }
+
+  const systemPrompt = `You are a Japanese reading assistant. Add ruby annotations to Japanese text.
+
+【Rules】
+1. Output ONLY the annotated text in HTML using <ruby> and <rt>;
+2. Keep the original text content intact (including kanji, kana, punctuation, spacing, and line breaks);
+3. Annotate ONLY kanji with hiragana in <rt>;
+4. Do NOT add ruby to non-kanji text (Latin letters, numbers, kana, symbols);
+5. Do NOT include any other HTML tags, markdown, or explanations.`;
+
+  const userPrompt = `Annotate this Japanese text with ruby (hiragana in <rt>):
+
+${payload.text}`;
+
+  const apiConfig = API_CONFIGS[provider];
+  const endpoint = provider === 'openai'
+    ? normalizeOpenAIEndpoint(baseUrl)
+    : `${baseUrl}${apiConfig.endpointPath}`;
+  const authHeader = apiConfig.authHeader === 'Bearer'
+    ? `Bearer ${apiKey}`
+    : apiKey;
+
   const streamFormat = getStreamFormat(provider);
   const requestBody = streamFormat === 'openai'
     ? {
@@ -470,12 +557,133 @@ async function handleAIStream(payload: QueryPayload, port: chrome.runtime.Port):
   }
 }
 
+async function handleKanaStream(payload: KanaPayload, port: chrome.runtime.Port): Promise<void> {
+  const { streamFormat, endpoint, headers, requestBody, isChineseUI } = await buildKanaRequestConfig(payload);
+
+  const controller = new AbortController();
+
+  const timeoutId = setTimeout(() => {
+    controller.abort();
+    port.postMessage({ type: 'error', error: isChineseUI ? '请求超时（30秒）' : 'Request timeout (30s)' });
+  }, REQUEST_TIMEOUT);
+
+  const onDisconnect = () => {
+    clearTimeout(timeoutId);
+    controller.abort();
+  };
+  port.onDisconnect.addListener(onDisconnect);
+
+  let doneSent = false;
+
+  try {
+    console.log('[AI Search] kana requestBody (stream):', JSON.stringify(requestBody, null, 2));
+
+    const response = await fetch(endpoint, {
+      method: 'POST',
+      headers,
+      body: JSON.stringify(requestBody),
+      signal: controller.signal
+    });
+
+    if (!response.ok) {
+      throw new Error(await readErrorMessage(response));
+    }
+
+    const reader = response.body?.getReader();
+    if (!reader) {
+      throw new Error(isChineseUI ? '无法读取流式响应' : 'Unable to read streaming response');
+    }
+
+    const decoder = new TextDecoder();
+    let buffer = '';
+
+    while (true) {
+      const { value, done } = await reader.read();
+      if (done) break;
+
+      buffer += decoder.decode(value, { stream: true });
+      const lines = buffer.split(/\r?\n/);
+      buffer = lines.pop() || '';
+
+      for (const line of lines) {
+        const trimmed = line.trim();
+        if (!trimmed || !trimmed.startsWith('data:')) continue;
+
+        const data = trimmed.slice(5).trim();
+        if (data === '[DONE]') {
+          doneSent = true;
+          port.postMessage({ type: 'done' });
+          return;
+        }
+
+        try {
+          const parsed = JSON.parse(data);
+          const result = streamFormat === 'openai'
+            ? parseOpenAIStreamPayload(parsed)
+            : parseAnthropicStreamPayload(parsed);
+          if (result.delta) {
+            port.postMessage({ type: 'delta', data: result.delta });
+          }
+          if (result.done) {
+            doneSent = true;
+            port.postMessage({ type: 'done' });
+            return;
+          }
+        } catch (error) {
+          console.warn('[AI Search] Kana stream chunk parse error:', error);
+        }
+      }
+    }
+
+    const remaining = buffer.trim();
+    if (remaining.startsWith('data:')) {
+      const data = remaining.slice(5).trim();
+      if (data === '[DONE]') {
+        doneSent = true;
+        port.postMessage({ type: 'done' });
+        return;
+      }
+      try {
+        const parsed = JSON.parse(data);
+        const result = streamFormat === 'openai'
+          ? parseOpenAIStreamPayload(parsed)
+          : parseAnthropicStreamPayload(parsed);
+        if (result.delta) {
+          port.postMessage({ type: 'delta', data: result.delta });
+        }
+        if (result.done) {
+          doneSent = true;
+          port.postMessage({ type: 'done' });
+          return;
+        }
+      } catch (error) {
+        console.warn('[AI Search] Kana stream tail parse error:', error);
+      }
+    }
+  } catch (error) {
+    if ((error as Error).name !== 'AbortError') {
+      port.postMessage({ type: 'error', error: (error as Error).message || String(error) });
+    }
+  } finally {
+    clearTimeout(timeoutId);
+    port.onDisconnect.removeListener(onDisconnect);
+    if (!doneSent) {
+      port.postMessage({ type: 'done' });
+    }
+  }
+}
+
 chrome.runtime.onConnect.addListener((port) => {
-  if (port.name !== 'ai-stream' && port.name !== 'ai-translate-stream') return;
+  if (port.name !== 'ai-stream' && port.name !== 'ai-translate-stream' && port.name !== 'ai-kana-stream') return;
 
   port.onMessage.addListener((message) => {
     if (message?.action === 'queryAIStream') {
       handleAIStream(message.payload as QueryPayload, port).catch((error) => {
+        port.postMessage({ type: 'error', error: error.message || String(error) });
+      });
+
+    } else if (message?.action === 'queryKana') {
+      handleKanaStream(message.payload as KanaPayload, port).catch((error) => {
         port.postMessage({ type: 'error', error: error.message || String(error) });
       });
 

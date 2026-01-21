@@ -6,6 +6,42 @@ export class ContextExtractor {
   private static MIN_CONTEXT_LENGTH = 500;
   // Maximum context length to prevent excessive data
   private static MAX_CONTEXT_LENGTH = 3000;
+  private static IGNORED_TAGS = new Set(['STYLE', 'SCRIPT', 'NOSCRIPT']);
+
+  private static isLikelyCssText(text: string): boolean {
+    if (text.length < 20) return false;
+    if (/@(media|keyframes|font-face|supports)\b/i.test(text)) return true;
+    if (/[.#][a-z0-9_-]+\s*\{/i.test(text)) return true;
+    if (/[a-z-]+\s*:\s*[^;]+;/i.test(text) && text.includes('{') && text.includes('}')) return true;
+    return false;
+  }
+
+  private static getCleanText(root: Node, selectedText: string): string {
+    const walker = document.createTreeWalker(root, NodeFilter.SHOW_TEXT, {
+      acceptNode: (node) => {
+        const parent = node.parentElement;
+        if (parent && this.IGNORED_TAGS.has(parent.tagName)) return NodeFilter.FILTER_REJECT;
+        return NodeFilter.FILTER_ACCEPT;
+      }
+    });
+
+    const parts: string[] = [];
+    let current: Node | null = walker.nextNode();
+    while (current) {
+      const raw = current.textContent || '';
+      const cleaned = raw.replace(/\s+/g, ' ').trim();
+      if (cleaned) {
+        const keepForSelection = selectedText && raw.includes(selectedText);
+        if (!keepForSelection && this.isLikelyCssText(cleaned)) {
+          current = walker.nextNode();
+          continue;
+        }
+        parts.push(cleaned);
+      }
+      current = walker.nextNode();
+    }
+    return parts.join(' ').trim();
+  }
 
   /**
    * Extracts context around the current selection.
@@ -17,6 +53,7 @@ export class ContextExtractor {
 
     const range = selection.getRangeAt(0);
     const container = range.commonAncestorContainer;
+    const selectedText = selection.toString().trim();
 
     // Start with the container element's text
     let contextElement: Node | null = container;
@@ -32,11 +69,10 @@ export class ContextExtractor {
       contextElement = contextElement.parentElement;
     }
 
-    let context = contextElement?.textContent?.trim() || '';
+    let context = contextElement ? this.getCleanText(contextElement, selectedText) : '';
     
     // Truncate if too long, keeping content around the selection
     if (context.length > this.MAX_CONTEXT_LENGTH) {
-      const selectedText = selection.toString();
       const selectionIndex = context.indexOf(selectedText);
       
       if (selectionIndex !== -1) {

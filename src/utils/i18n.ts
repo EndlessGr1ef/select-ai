@@ -61,6 +61,8 @@ export const translations = {
     translationSettingsTitle: { zh: '双语字幕翻译设置', en: 'Bilingual Subtitle Translation Settings' },
     translationButtonToggleLabel: { zh: '显示翻译按钮', en: 'Show translation button' },
     translationButtonToggleHint: { zh: '控制页面悬浮翻译按钮是否显示', en: 'Control visibility of the floating translation button' },
+    kanaRubyToggleLabel: { zh: '显示日语汉字假名标注', en: 'Show kana ruby for Japanese kanji' },
+    kanaRubyToggleHint: { zh: '控制划词弹窗中是否显示日语汉字的假名标注', en: 'Control whether kana ruby appears above Japanese kanji in popup' },
     // Guide steps for translation tab
     translationGuideSteps: {
       zh: ['打开任意网页', '点击翻译按钮查看选中部分或全页面翻译'],

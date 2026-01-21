@@ -101,10 +101,11 @@ const OptionsApp: React.FC = () => {
   const [concurrency, setConcurrency] = useState(10);
   const [blacklistEnabled, setBlacklistEnabled] = useState(true);
   const [translationButtonEnabled, setTranslationButtonEnabled] = useState(true);
+  const [kanaRubyEnabled, setKanaRubyEnabled] = useState(true);
 
   useEffect(() => {
     setLang(getUILanguage());
-    chrome.storage.local.get(['selectedProvider', 'targetLanguage', 'translationConcurrency', 'translationBlacklistEnabled', 'translationButtonEnabled'], (result) => {
+    chrome.storage.local.get(['selectedProvider', 'targetLanguage', 'translationConcurrency', 'translationBlacklistEnabled', 'translationButtonEnabled', 'kanaRubyEnabled'], (result) => {
       if (result.selectedProvider) {
         setProvider(result.selectedProvider as Provider);
       }
@@ -112,6 +113,7 @@ const OptionsApp: React.FC = () => {
       setConcurrency((result.translationConcurrency as number) || 10);
       setBlacklistEnabled(result.translationBlacklistEnabled !== false);
       setTranslationButtonEnabled(result.translationButtonEnabled !== false);
+      setKanaRubyEnabled(result.kanaRubyEnabled !== false);
 
       setIsLoading(false);
     });
@@ -130,7 +132,7 @@ const OptionsApp: React.FC = () => {
     });
   }, [provider]);
 
-  const t = translations.options;
+  const t = translations.options as typeof translations.options & { rakutenName: { zh: string; en: string } };
   const modelOptions = PROVIDER_MODEL_OPTIONS[provider] || [];
 
   const handleSave = () => {
@@ -143,7 +145,8 @@ const OptionsApp: React.FC = () => {
       targetLanguage: targetLang,
       translationConcurrency: concurrency,
       translationBlacklistEnabled: blacklistEnabled,
-      translationButtonEnabled
+      translationButtonEnabled,
+      kanaRubyEnabled
     }, () => {
       setStatus({ type: 'success', message: t.saveSuccess[lang] });
       setTimeout(() => setStatus({ type: 'idle', message: '' }), 3000);
@@ -610,6 +613,19 @@ const OptionsApp: React.FC = () => {
                   {t.translationButtonToggleLabel[lang]}
                 </label>
                 <p style={{ ...hintStyle, marginLeft: 30 }}>{t.translationButtonToggleHint[lang]}</p>
+              </div>
+
+              <div style={{ marginBottom: 24 }}>
+                <label style={{ ...labelStyle, display: 'flex', alignItems: 'center', gap: 12 }}>
+                  <input
+                    type="checkbox"
+                    checked={kanaRubyEnabled}
+                    onChange={(e) => setKanaRubyEnabled(e.target.checked)}
+                    style={{ width: 18, height: 18, cursor: 'pointer', accentColor: '#8b5cf6' }}
+                  />
+                  {t.kanaRubyToggleLabel[lang]}
+                </label>
+                <p style={{ ...hintStyle, marginLeft: 30 }}>{t.kanaRubyToggleHint[lang]}</p>
               </div>
 
               <div style={{ marginBottom: 24 }}>

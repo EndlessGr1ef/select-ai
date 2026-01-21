@@ -17,3 +17,15 @@ export function detectTextLanguage(text: string): 'zh' | 'en' {
   // If Chinese characters exceed 20%, consider it Chinese
   return (chineseCount / totalChars) > 0.2 ? 'zh' : 'en';
 }
+
+export function containsHiraganaOrKatakana(text: string): boolean {
+  return /[\u3040-\u30ff]/.test(text);
+}
+
+export function containsKanji(text: string): boolean {
+  return /[\u3400-\u4dbf\u4e00-\u9fff]/.test(text);
+}
+
+export function isLikelyJapanese(text: string): boolean {
+  return containsHiraganaOrKatakana(text);
+}
