@@ -1,4 +1,4 @@
-import React, { useState, useEffect, useRef } from 'react';
+import { useState, useEffect, useRef, type FC, type CSSProperties, type MouseEvent as ReactMouseEvent } from 'react';
 import ReactMarkdown from 'react-markdown';
 import { ContextExtractor } from '../utils/ContextExtractor';
 import { containsKanji, getUILanguage, isLikelyJapanese } from '../utils/language';
@@ -6,7 +6,7 @@ import { translations } from '../utils/i18n';
 
 type Provider = 'openai' | 'anthropic' | 'minimax' | 'deepseek' | 'glm';
 
-const ContentApp: React.FC = () => {
+const ContentApp: FC = () => {
   const [selection, setSelection] = useState<string>('');
   const [position, setPosition] = useState<{ x: number; y: number }>({ x: 0, y: 0 });
   const [showDot, setShowDot] = useState(false);
@@ -16,11 +16,11 @@ const ContentApp: React.FC = () => {
   const [kanaText, setKanaText] = useState('');
   const [kanaLoading, setKanaLoading] = useState(false);
   const [kanaRubyEnabled, setKanaRubyEnabled] = useState(true);
-  const [modelName, setModelName] = useState('gpt-4o');
+  const [modelName, setModelName] = useState('deepseek-chat');
   const [lang, setLang] = useState<'zh' | 'en'>('zh');
   const [targetLang, setTargetLang] = useState('中文');
   const [isTextExpanded, setIsTextExpanded] = useState(false);
-  const [contextMaxTokens, setContextMaxTokens] = useState(2000);
+  const [contextMaxTokens, setContextMaxTokens] = useState(5000);
   const [sourceLang, setSourceLang] = useState<string | null>(null);
 
   const clampValue = (value: number, min: number, max: number) => Math.min(Math.max(value, min), max);
@@ -152,7 +152,7 @@ const ContentApp: React.FC = () => {
       setModelName((modelResult[modelKey] as string) || defaultModels[providerValue]);
       setTargetLang((result.targetLanguage as string) || '中文');
       setKanaRubyEnabled(result.kanaRubyEnabled !== false);
-      setContextMaxTokens((result.contextMaxTokens as number) || 2000);
+      setContextMaxTokens((result.contextMaxTokens as number) || 5000);
     };
     getProviderConfig();
 
@@ -164,7 +164,7 @@ const ContentApp: React.FC = () => {
         setKanaRubyEnabled(changes.kanaRubyEnabled.newValue !== false);
       }
       if (changes.contextMaxTokens) {
-        setContextMaxTokens((changes.contextMaxTokens.newValue as number) || 2000);
+        setContextMaxTokens((changes.contextMaxTokens.newValue as number) || 5000);
       }
       if (changes.selectedProvider) {
         const providerValue = (changes.selectedProvider.newValue as Provider) || 'deepseek';
@@ -225,7 +225,7 @@ const ContentApp: React.FC = () => {
   };
 
   // Drag handlers for panel repositioning
-  const handleDragStart = (e: React.MouseEvent) => {
+  const handleDragStart = (e: ReactMouseEvent) => {
     e.preventDefault();
     setIsDragging(true);
     dragStartRef.current = {
@@ -266,7 +266,7 @@ const ContentApp: React.FC = () => {
   }, [isDragging]);
 
   // Resize handlers for panel
-  const handleResizeStart = (e: React.MouseEvent, direction: 'n' | 's' | 'e' | 'w' | 'ne' | 'nw' | 'se' | 'sw') => {
+  const handleResizeStart = (e: ReactMouseEvent, direction: 'n' | 's' | 'e' | 'w' | 'ne' | 'nw' | 'se' | 'sw') => {
     e.preventDefault();
     e.stopPropagation();
     setIsResizing(true);
@@ -611,7 +611,7 @@ const ContentApp: React.FC = () => {
   }, []);
 
   // Styles
-  const dotStyle: React.CSSProperties = {
+  const dotStyle: CSSProperties = {
     position: 'fixed',
     left: position.x,
     top: position.y - window.scrollY,
@@ -621,7 +621,7 @@ const ContentApp: React.FC = () => {
     padding: 3,
   };
 
-  const dotInnerStyle: React.CSSProperties = {
+  const dotInnerStyle: CSSProperties = {
     width: 10,
     height: 10,
     background: 'linear-gradient(135deg, #ef4444 0%, #8b5cf6 100%)',
@@ -636,7 +636,7 @@ const ContentApp: React.FC = () => {
   const maxPanelLeft = Math.max(safeMargin, viewportWidth - panelSize.width - safeMargin);
   const maxPanelTop = Math.max(safeMargin, viewportHeight - panelSize.height - safeMargin);
 
-  const panelStyle: React.CSSProperties = {
+  const panelStyle: CSSProperties = {
     position: 'fixed',
     left: clampValue(rawPanelLeft, safeMargin, maxPanelLeft),
     top: clampValue(rawPanelTop, safeMargin, maxPanelTop),
@@ -655,7 +655,7 @@ const ContentApp: React.FC = () => {
     flexDirection: 'column',
   };
 
-  const headerStyle: React.CSSProperties = {
+  const headerStyle: CSSProperties = {
     display: 'flex',
     justifyContent: 'space-between',
     alignItems: 'center',
@@ -666,7 +666,7 @@ const ContentApp: React.FC = () => {
     userSelect: 'none',
   };
 
-  const modelBadgeStyle: React.CSSProperties = {
+  const modelBadgeStyle: CSSProperties = {
     display: 'flex',
     alignItems: 'center',
     gap: 6,
@@ -679,7 +679,7 @@ const ContentApp: React.FC = () => {
     color: '#374151',
   };
 
-  const closeButtonStyle: React.CSSProperties = {
+  const closeButtonStyle: CSSProperties = {
     background: 'none',
     border: 'none',
     cursor: 'pointer',
@@ -688,7 +688,7 @@ const ContentApp: React.FC = () => {
     padding: 4,
   };
 
-  const contentStyle: React.CSSProperties = {
+  const contentStyle: CSSProperties = {
     padding: 16,
     flex: 1,
     overflow: 'hidden',
@@ -696,7 +696,7 @@ const ContentApp: React.FC = () => {
     flexDirection: 'column',
   };
 
-  const selectionTitleStyle: React.CSSProperties = {
+  const selectionTitleStyle: CSSProperties = {
     fontSize: 16,
     fontWeight: 600,
     marginBottom: 8,
@@ -704,7 +704,7 @@ const ContentApp: React.FC = () => {
     lineHeight: 1.5,
   };
 
-  const kanaTextStyle: React.CSSProperties = {
+  const kanaTextStyle: CSSProperties = {
     fontSize: 12,
     color: '#6b7280',
     marginBottom: 6,
@@ -712,12 +712,12 @@ const ContentApp: React.FC = () => {
     whiteSpace: 'pre-wrap',
   };
 
-  const selectionContainerStyle: React.CSSProperties = {
+  const selectionContainerStyle: CSSProperties = {
     padding: 12,
     marginBottom: 12,
   };
 
-  const toggleButtonStyle: React.CSSProperties = {
+  const toggleButtonStyle: CSSProperties = {
     background: 'none',
     border: 'none',
     cursor: 'pointer',
@@ -728,19 +728,19 @@ const ContentApp: React.FC = () => {
     textDecoration: 'underline',
   };
 
-  const dividerStyle: React.CSSProperties = {
+  const dividerStyle: CSSProperties = {
     height: 1,
     backgroundColor: '#e5e7eb',
     marginBottom: 12,
   };
 
-  const resultStyle: React.CSSProperties = {
+  const resultStyle: CSSProperties = {
     fontSize: 14,
     lineHeight: 1.6,
     color: '#374151',
   };
 
-  const loadingStyle: React.CSSProperties = {
+  const loadingStyle: CSSProperties = {
     display: 'flex',
     alignItems: 'center',
     gap: 10,
@@ -748,7 +748,7 @@ const ContentApp: React.FC = () => {
     padding: '20px 0',
   };
 
-  const spinnerStyle: React.CSSProperties = {
+  const spinnerStyle: CSSProperties = {
     width: 18,
     height: 18,
     border: '2px solid #e5e7eb',
@@ -757,7 +757,7 @@ const ContentApp: React.FC = () => {
     animation: 'spin 1s linear infinite',
   };
 
-  const footerStyle: React.CSSProperties = {
+  const footerStyle: CSSProperties = {
     display: 'flex',
     justifyContent: 'flex-end',
     gap: 8,
@@ -766,7 +766,7 @@ const ContentApp: React.FC = () => {
     borderTop: '1px solid #f3f4f6',
   };
 
-  const actionButtonStyle: React.CSSProperties = {
+  const actionButtonStyle: CSSProperties = {
     background: 'none',
     border: 'none',
     cursor: 'pointer',
@@ -778,7 +778,7 @@ const ContentApp: React.FC = () => {
     justifyContent: 'center',
   };
 
-  const resizeHandleStyle: React.CSSProperties = {
+  const resizeHandleStyle: CSSProperties = {
     position: 'absolute',
     backgroundColor: 'transparent',
     zIndex: 10,

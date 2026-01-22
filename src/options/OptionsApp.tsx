@@ -1,4 +1,4 @@
-import React, { useState, useEffect } from 'react';
+import { useState, useEffect, Fragment, type FC, type CSSProperties } from 'react';
 import { getUILanguage, isBrowserChinese } from '../utils/language';
 import { translations } from '../utils/i18n';
 import {
@@ -89,7 +89,7 @@ function getDefaultTargetLanguage(): string {
 
 type TabType = 'api' | 'translation';
 
-const OptionsApp: React.FC = () => {
+const OptionsApp: FC = () => {
   const [activeTab, setActiveTab] = useState<TabType>('api');
   const [provider, setProvider] = useState<Provider>('deepseek');
   const [apiKey, setApiKey] = useState('');
@@ -105,7 +105,7 @@ const OptionsApp: React.FC = () => {
   const [blacklistEnabled, setBlacklistEnabled] = useState(true);
   const [translationButtonEnabled, setTranslationButtonEnabled] = useState(true);
   const [kanaRubyEnabled, setKanaRubyEnabled] = useState(true);
-  const [contextMaxTokens, setContextMaxTokens] = useState(2000);
+  const [contextMaxTokens, setContextMaxTokens] = useState(5000);
   const [isTesting, setIsTesting] = useState(false);
   const [testStatus, setTestStatus] = useState<{ type: 'success' | 'error' | 'idle', message: string }>({ type: 'idle', message: '' });
 
@@ -120,7 +120,7 @@ const OptionsApp: React.FC = () => {
       setBlacklistEnabled(result.translationBlacklistEnabled !== false);
       setTranslationButtonEnabled(result.translationButtonEnabled !== false);
       setKanaRubyEnabled(result.kanaRubyEnabled !== false);
-      setContextMaxTokens((result.contextMaxTokens as number) || 2000);
+      setContextMaxTokens((result.contextMaxTokens as number) || 5000);
 
       setIsLoading(false);
     });
@@ -209,14 +209,14 @@ const OptionsApp: React.FC = () => {
     }
   };
 
-  const containerStyle: React.CSSProperties = {
+  const containerStyle: CSSProperties = {
     minHeight: '100vh',
     background: 'linear-gradient(180deg, #f1f5f9 0%, #e2e8f0 100%)',
     padding: '48px 24px',
     fontFamily: '-apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif',
   };
 
-  const cardStyle: React.CSSProperties = {
+  const cardStyle: CSSProperties = {
     maxWidth: 600,
     margin: '0 auto',
     backgroundColor: '#fff',
@@ -225,20 +225,20 @@ const OptionsApp: React.FC = () => {
     overflow: 'hidden',
   };
 
-  const headerStyle: React.CSSProperties = {
+  const headerStyle: CSSProperties = {
     background: 'linear-gradient(135deg, #1e1b4b 0%, #312e81 100%)',
     padding: '32px 32px 28px',
     color: '#fff',
   };
 
-  const logoStyle: React.CSSProperties = {
+  const logoStyle: CSSProperties = {
     display: 'flex',
     alignItems: 'center',
     gap: 18,
     marginBottom: 12,
   };
 
-  const iconStyle: React.CSSProperties = {
+  const iconStyle: CSSProperties = {
     width: 56,
     height: 56,
     display: 'flex',
@@ -246,26 +246,26 @@ const OptionsApp: React.FC = () => {
     justifyContent: 'center',
   };
 
-  const titleStyle: React.CSSProperties = {
+  const titleStyle: CSSProperties = {
     fontSize: 26,
     fontWeight: 700,
     margin: 0,
     letterSpacing: '-0.5px',
   };
 
-  const subtitleStyle: React.CSSProperties = {
+  const subtitleStyle: CSSProperties = {
     fontSize: 14,
     opacity: 0.85,
     marginTop: 2,
   };
 
-  const tabContainerStyle: React.CSSProperties = {
+  const tabContainerStyle: CSSProperties = {
     display: 'flex',
     gap: 6,
     marginTop: 24,
   };
 
-  const getTabStyle = (isActive: boolean): React.CSSProperties => ({
+  const getTabStyle = (isActive: boolean): CSSProperties => ({
     padding: '10px 18px',
     borderRadius: 10,
     fontSize: 14,
@@ -280,15 +280,15 @@ const OptionsApp: React.FC = () => {
     gap: 8,
   });
 
-  const formStyle: React.CSSProperties = {
+  const formStyle: CSSProperties = {
     padding: '32px 32px 28px',
   };
 
-  const sectionStyle: React.CSSProperties = {
+  const sectionStyle: CSSProperties = {
     marginBottom: 32,
   };
 
-  const sectionTitleStyle: React.CSSProperties = {
+  const sectionTitleStyle: CSSProperties = {
     fontSize: 12,
     fontWeight: 600,
     color: '#64748b',
@@ -300,7 +300,7 @@ const OptionsApp: React.FC = () => {
     gap: 8,
   };
 
-  const labelStyle: React.CSSProperties = {
+  const labelStyle: CSSProperties = {
     display: 'block',
     fontSize: 14,
     fontWeight: 500,
@@ -308,7 +308,7 @@ const OptionsApp: React.FC = () => {
     marginBottom: 8,
   };
 
-  const inputStyle: React.CSSProperties = {
+  const inputStyle: CSSProperties = {
     width: '100%',
     padding: '14px 16px',
     fontSize: 14,
@@ -320,7 +320,7 @@ const OptionsApp: React.FC = () => {
     boxSizing: 'border-box' as const,
   };
 
-  const selectStyle: React.CSSProperties = {
+  const selectStyle: CSSProperties = {
     ...inputStyle,
     cursor: 'pointer',
     appearance: 'none' as const,
@@ -331,11 +331,11 @@ const OptionsApp: React.FC = () => {
     paddingRight: 48,
   };
 
-  const modelInputWrapperStyle: React.CSSProperties = {
+  const modelInputWrapperStyle: CSSProperties = {
     position: 'relative',
   };
 
-  const modelOptionsStyle: React.CSSProperties = {
+  const modelOptionsStyle: CSSProperties = {
     position: 'absolute',
     top: '100%',
     left: 0,
@@ -350,25 +350,25 @@ const OptionsApp: React.FC = () => {
     zIndex: 20,
   };
 
-  const modelOptionItemStyle: React.CSSProperties = {
+  const modelOptionItemStyle: CSSProperties = {
     padding: '12px 16px',
     fontSize: 14,
     cursor: 'pointer',
   };
 
-  const hintStyle: React.CSSProperties = {
+  const hintStyle: CSSProperties = {
     fontSize: 12,
     color: '#94a3b8',
     marginTop: 6,
   };
 
-  const rowStyle: React.CSSProperties = {
+  const rowStyle: CSSProperties = {
     display: 'grid',
     gridTemplateColumns: '1fr 1fr',
     gap: 16,
   };
 
-  const buttonStyle: React.CSSProperties = {
+  const buttonStyle: CSSProperties = {
     width: '100%',
     padding: '16px 24px',
     fontSize: 15,
@@ -386,7 +386,7 @@ const OptionsApp: React.FC = () => {
     gap: 10,
   };
 
-  const statusStyle: React.CSSProperties = {
+  const statusStyle: CSSProperties = {
     textAlign: 'center' as const,
     padding: '14px 18px',
     borderRadius: 12,
@@ -401,7 +401,7 @@ const OptionsApp: React.FC = () => {
     gap: 8,
   };
 
-  const infoCardStyle: React.CSSProperties = {
+  const infoCardStyle: CSSProperties = {
     backgroundColor: '#f8fafc',
     borderRadius: 14,
     padding: '22px',
@@ -409,7 +409,7 @@ const OptionsApp: React.FC = () => {
     border: '1px solid #e2e8f0',
   };
 
-  const infoTitleStyle: React.CSSProperties = {
+  const infoTitleStyle: CSSProperties = {
     fontSize: 14,
     fontWeight: 600,
     color: '#334155',
@@ -419,7 +419,7 @@ const OptionsApp: React.FC = () => {
     gap: 8,
   };
 
-  const infoListStyle: React.CSSProperties = {
+  const infoListStyle: CSSProperties = {
     margin: 0,
     paddingLeft: 20,
     fontSize: 13,
@@ -427,7 +427,7 @@ const OptionsApp: React.FC = () => {
     lineHeight: 1.85,
   };
 
-  const loadingOverlayStyle: React.CSSProperties = {
+  const loadingOverlayStyle: CSSProperties = {
     display: 'flex',
     justifyContent: 'center',
     alignItems: 'center',
@@ -435,7 +435,7 @@ const OptionsApp: React.FC = () => {
     color: '#64748b',
   };
 
-  const spinnerStyle: React.CSSProperties = {
+  const spinnerStyle: CSSProperties = {
     width: 36,
     height: 36,
     border: '3px solid #e2e8f0',
@@ -444,11 +444,11 @@ const OptionsApp: React.FC = () => {
     animation: 'spin 1s linear infinite',
   };
 
-  const inputWrapperStyle: React.CSSProperties = {
+  const inputWrapperStyle: CSSProperties = {
     position: 'relative' as const,
   };
 
-  const eyeButtonStyle: React.CSSProperties = {
+  const eyeButtonStyle: CSSProperties = {
     position: 'absolute' as const,
     right: 14,
     top: '50%',
@@ -530,7 +530,7 @@ const OptionsApp: React.FC = () => {
 
         <div style={formStyle}>
           {activeTab === 'api' && (
-            <React.Fragment>
+            <Fragment>
               <div style={sectionStyle}>
                 <div style={sectionTitleStyle}>
                   <Key size={14} strokeWidth={2} />
@@ -725,18 +725,18 @@ const OptionsApp: React.FC = () => {
                     value={contextMaxTokens}
                     onChange={(e) => {
                       const val = parseInt(e.target.value) || 0;
-                      setContextMaxTokens(Math.max(200, Math.min(10000, val)));
+                      setContextMaxTokens(Math.max(200, Math.min(50000, val)));
                     }}
                     onBlur={(e) => {
                       const val = parseInt(e.target.value) || 200;
-                      setContextMaxTokens(Math.max(200, Math.min(10000, val)));
+                      setContextMaxTokens(Math.max(200, Math.min(50000, val)));
                     }}
                     style={inputStyle}
                   />
                   <p style={hintStyle}>{t.contextMaxTokensHint[lang]}</p>
                 </div>
               </div>
-            </React.Fragment>
+            </Fragment>
           )}
 
           {activeTab === 'translation' && (

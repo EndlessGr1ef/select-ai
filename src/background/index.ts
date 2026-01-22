@@ -94,9 +94,9 @@ function normalizeOpenAIEndpoint(baseUrl: string): string {
 }
 
 // Maximum context length sent to API (in characters)
-const DEFAULT_CONTEXT_MAX_TOKENS = 2000;
+const DEFAULT_CONTEXT_MAX_TOKENS = 5000;
 const MIN_CONTEXT_MAX_TOKENS = 200;
-const MAX_CONTEXT_MAX_TOKENS = 10000;
+const MAX_CONTEXT_MAX_TOKENS = 50000;
 
 // Optimization 1: Config cache - avoid reading storage on every request
 let cachedProviderConfig: {
@@ -116,6 +116,13 @@ let cachedTranslationConcurrency: number | null = null;
 function clampContextMaxTokens(value: number): number {
   if (!Number.isFinite(value)) return DEFAULT_CONTEXT_MAX_TOKENS;
   return Math.max(MIN_CONTEXT_MAX_TOKENS, Math.min(MAX_CONTEXT_MAX_TOKENS, value));
+}
+
+// Sanitize string for HTTP headers (remove non-ASCII characters)
+function sanitizeForHeader(value: string): string {
+  if (!value) return '';
+  // Remove any character outside printable ASCII range (0x20-0x7E)
+  return value.replace(/[^\x20-\x7E]/g, '').trim();
 }
 
 async function getCachedProviderConfig() {
@@ -141,7 +148,7 @@ async function getCachedProviderConfig() {
 
   cachedProviderConfig = {
     provider,
-    apiKey: providerSettings[`${storageKey}ApiKey`] as string,
+    apiKey: sanitizeForHeader(providerSettings[`${storageKey}ApiKey`] as string),
     baseUrl: (providerSettings[`${storageKey}BaseUrl`] as string) || config.defaultBaseUrl,
     model: (providerSettings[`${storageKey}Model`] as string) || config.defaultModel,
     targetLang: (providerSettings.targetLanguage as string) || (isBrowserChinese() ? '中文' : 'English'),
@@ -1242,14 +1249,17 @@ async function handleTestConnection(payload: any, port: chrome.runtime.Port): Pr
     throw new Error(isChineseUI ? '请先在设置页面配置 API Key' : 'Please configure API Key in settings');
   }
 
+  // Sanitize API key to remove any non-ASCII characters (e.g., invisible Unicode from copy-paste)
+  const cleanApiKey = sanitizeForHeader(apiKey);
+
   const apiConfig = API_CONFIGS[provider as Provider];
   const endpoint = provider === 'openai'
     ? normalizeOpenAIEndpoint(baseUrl)
     : `${baseUrl}${apiConfig.endpointPath}`;
 
   const authHeader = apiConfig.authHeader === 'Bearer'
-    ? `Bearer ${apiKey}`
-    : apiKey;
+    ? `Bearer ${cleanApiKey}`
+    : cleanApiKey;
 
   const headers: Record<string, string> = {
     'Content-Type': 'application/json',

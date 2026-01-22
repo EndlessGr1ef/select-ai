@@ -64,7 +64,7 @@ Build generates `dist/` and `select-ai.zip`. Load `dist/` in Chrome or unzip `se
 | Feature | Description | Use Case |
 |---------|-------------|----------|
 | 🎯 **Smart Selection** | Floating button appears on text selection, click to query | Get instant explanations |
-| 🧠 **Context Awareness** | Auto-extract context (default 2000, adjustable 200-10000) | Technical terms, complex sentences |
+| 🧠 **Context Awareness** | Auto-extract context (default 5000, adjustable 200-500000) | Technical terms, complex sentences |
 | 🚀 **Streaming Output** | Stream responses in real time as they are generated | Get answers faster |
 | 🌐 **Multi-language** | Supports Chinese, English, Japanese, Korean output | Foreign language reading & learning |
 | 🇯🇵 **Kana Ruby** | Show kana above Japanese kanji (ruby) | Japanese reading & learning |
