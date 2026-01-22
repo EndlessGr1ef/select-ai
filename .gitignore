@@ -26,3 +26,7 @@ dist-ssr
 *.sw?
 CLAUDE.md
 docs/
+.pnpm-store
+task_plan.md
+progress.md
+findings.md

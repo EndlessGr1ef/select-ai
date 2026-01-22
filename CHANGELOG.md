@@ -1,5 +1,31 @@
 # Changelog / 更新日志
 
+## [0.3.4] - 2026-01-21
+
+### Added / 新增
+- API connection test in settings / 设置页新增 API 连接测试
+
+### Changed / 改进
+- Improved language detection and response formatting / 优化语言检测与回答格式
+- Show error messages directly in results / 错误信息直接展示在结果中
+
+### Fixed / 修复
+- Safe postMessage handling for port disconnects / 断开连接时的消息发送保护
+
+---
+
+## [0.3.3] - 2026-01-21
+
+### Added / 新增
+- Kana ruby toggle for Japanese kanji / 日语汉字假名标注开关
+- Original text TTS / 原文朗读（TTS）
+- Configurable context length (max_tokens) / 可配置上下文长度（max_tokens）
+
+### Changed / 改进
+- Increased context max tokens and improved extraction / 提升上下文最大长度与抽取优化
+
+---
+
 ## [0.3.2] - 2026-01-20
 
 ### Fixed / 修复
