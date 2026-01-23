@@ -17,71 +17,7 @@ import {
   Loader2
 } from 'lucide-react';
 import { icons } from '../resource';
-
-type Provider = 'openai' | 'anthropic' | 'minimax' | 'deepseek' | 'glm';
-
-interface ProviderConfig {
-  name: Record<'zh' | 'en', string>;
-  defaultBaseUrl: string;
-  defaultModel: string;
-  storageKey: string;
-}
-
-const PROVIDER_CONFIGS: Record<Provider, ProviderConfig> = {
-  openai: {
-    name: { zh: 'OpenAI', en: 'OpenAI' },
-    defaultBaseUrl: 'https://api.openai.com/v1/chat/completions',
-    defaultModel: 'gpt-4o',
-    storageKey: 'openai',
-  },
-  anthropic: {
-    name: { zh: 'Anthropic', en: 'Anthropic' },
-    defaultBaseUrl: 'https://api.anthropic.com/v1/messages',
-    defaultModel: 'claude-sonnet-4-5',
-    storageKey: 'anthropic',
-  },
-  minimax: {
-    name: { zh: 'MiniMax', en: 'MiniMax' },
-    defaultBaseUrl: 'https://api.minimaxi.com/anthropic',
-    defaultModel: 'MiniMax-M2.1',
-    storageKey: 'minimax',
-  },
-  deepseek: {
-    name: { zh: 'DeepSeek', en: 'DeepSeek' },
-    defaultBaseUrl: 'https://api.deepseek.com',
-    defaultModel: 'deepseek-chat',
-    storageKey: 'deepseek',
-  },
-  glm: {
-    name: { zh: '智谱 AI', en: 'Zhipu AI' },
-    defaultBaseUrl: 'https://open.bigmodel.cn/api/anthropic',
-    defaultModel: 'glm-4.7',
-    storageKey: 'glm',
-  },
-};
-
-const PROVIDER_MODEL_OPTIONS: Record<Provider, string[]> = {
-  openai: [
-    'gpt-4o',
-    'gpt-4-turbo',
-    'gpt-4',
-  ],
-  anthropic: [
-    'claude-sonnet-4-5',
-    'claude-haiku-4-5',
-    'claude-opus-4-5',
-  ],
-  deepseek: [
-    'deepseek-chat',
-    'deepseek-reasoner',
-  ],
-  minimax: [
-    'MiniMax-M2.1',
-  ],
-  glm: [
-    'glm-4.7',
-  ],
-};
+import { type Provider, PROVIDER_CONFIGS, CONTEXT_MAX_TOKENS } from '../config';
 
 function getDefaultTargetLanguage(): string {
   return isBrowserChinese() ? '中文' : 'English';
@@ -105,13 +41,14 @@ const OptionsApp: FC = () => {
   const [blacklistEnabled, setBlacklistEnabled] = useState(true);
   const [translationButtonEnabled, setTranslationButtonEnabled] = useState(true);
   const [kanaRubyEnabled, setKanaRubyEnabled] = useState(true);
-  const [contextMaxTokens, setContextMaxTokens] = useState(5000);
+  const [contextMaxTokens, setContextMaxTokens] = useState<number>(CONTEXT_MAX_TOKENS.default);
+  const [explanationDetailLevel, setExplanationDetailLevel] = useState<'concise' | 'standard' | 'detailed'>('concise');
   const [isTesting, setIsTesting] = useState(false);
   const [testStatus, setTestStatus] = useState<{ type: 'success' | 'error' | 'idle', message: string }>({ type: 'idle', message: '' });
 
   useEffect(() => {
     setLang(getUILanguage());
-    chrome.storage.local.get(['selectedProvider', 'targetLanguage', 'translationConcurrency', 'translationBlacklistEnabled', 'translationButtonEnabled', 'kanaRubyEnabled', 'contextMaxTokens'], (result) => {
+    chrome.storage.local.get(['selectedProvider', 'targetLanguage', 'translationConcurrency', 'translationBlacklistEnabled', 'translationButtonEnabled', 'kanaRubyEnabled', 'contextMaxTokens', 'explanationDetailLevel'], (result) => {
       if (result.selectedProvider) {
         setProvider(result.selectedProvider as Provider);
       }
@@ -120,7 +57,11 @@ const OptionsApp: FC = () => {
       setBlacklistEnabled(result.translationBlacklistEnabled !== false);
       setTranslationButtonEnabled(result.translationButtonEnabled !== false);
       setKanaRubyEnabled(result.kanaRubyEnabled !== false);
-      setContextMaxTokens((result.contextMaxTokens as number) || 5000);
+      setContextMaxTokens((result.contextMaxTokens as number) || CONTEXT_MAX_TOKENS.default);
+      const rawDetailLevel = result.explanationDetailLevel as string | undefined;
+      if (rawDetailLevel === 'concise' || rawDetailLevel === 'standard' || rawDetailLevel === 'detailed') {
+        setExplanationDetailLevel(rawDetailLevel);
+      }
 
       setIsLoading(false);
     });
@@ -140,7 +81,7 @@ const OptionsApp: FC = () => {
   }, [provider]);
 
   const t = translations.options as typeof translations.options;
-  const modelOptions = PROVIDER_MODEL_OPTIONS[provider] || [];
+  const modelOptions = PROVIDER_CONFIGS[provider]?.modelOptions || [];
 
   const handleSave = () => {
     const providerStorageKey = PROVIDER_CONFIGS[provider].storageKey;
@@ -154,7 +95,8 @@ const OptionsApp: FC = () => {
       translationBlacklistEnabled: blacklistEnabled,
       translationButtonEnabled,
       kanaRubyEnabled,
-      contextMaxTokens
+      contextMaxTokens,
+      explanationDetailLevel
     }, () => {
       setStatus({ type: 'success', message: t.saveSuccess[lang] });
       setTimeout(() => setStatus({ type: 'idle', message: '' }), 3000);
@@ -725,15 +667,29 @@ const OptionsApp: FC = () => {
                     value={contextMaxTokens}
                     onChange={(e) => {
                       const val = parseInt(e.target.value) || 0;
-                      setContextMaxTokens(Math.max(200, Math.min(50000, val)));
+                      setContextMaxTokens(Math.max(CONTEXT_MAX_TOKENS.min, Math.min(CONTEXT_MAX_TOKENS.max, val)));
                     }}
                     onBlur={(e) => {
-                      const val = parseInt(e.target.value) || 200;
-                      setContextMaxTokens(Math.max(200, Math.min(50000, val)));
+                      const val = parseInt(e.target.value) || CONTEXT_MAX_TOKENS.min;
+                      setContextMaxTokens(Math.max(CONTEXT_MAX_TOKENS.min, Math.min(CONTEXT_MAX_TOKENS.max, val)));
                     }}
                     style={inputStyle}
                   />
                   <p style={hintStyle}>{t.contextMaxTokensHint[lang]}</p>
+                </div>
+
+                <div style={{ marginTop: 20 }}>
+                  <label style={labelStyle}>{t.explanationDetailLabel[lang]}</label>
+                  <select
+                    value={explanationDetailLevel}
+                    onChange={(e) => setExplanationDetailLevel(e.target.value as 'concise' | 'standard' | 'detailed')}
+                    style={selectStyle}
+                  >
+                    <option value="concise">{t.explanationDetailConcise[lang]}</option>
+                    <option value="standard">{t.explanationDetailStandard[lang]}</option>
+                    <option value="detailed">{t.explanationDetailDetailed[lang]}</option>
+                  </select>
+                  <p style={hintStyle}>{t.explanationDetailHint[lang]}</p>
                 </div>
               </div>
             </Fragment>

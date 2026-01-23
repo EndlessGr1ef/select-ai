@@ -2,82 +2,20 @@
 
 console.log('[AI Search] Background service worker loaded');
 
-// Provider configurations
-type Provider = 'openai' | 'anthropic' | 'minimax' | 'deepseek' | 'glm';
-
-interface ProviderConfig {
-  defaultBaseUrl: string;
-  defaultModel: string;
-  storageKey: string;
-}
-
-interface ProviderApiConfig {
-  endpointPath: string;  // API endpoint path
-  authHeader: 'Bearer' | 'x-api-key';  // Authentication scheme
-  extraHeaders: Record<string, string>;  // Additional headers
-}
-
-const PROVIDER_CONFIGS: Record<Provider, ProviderConfig> = {
-  openai: {
-    defaultBaseUrl: 'https://api.openai.com/v1/chat/completions',
-    defaultModel: 'gpt-4o',
-    storageKey: 'openai',
-  },
-  anthropic: {
-    defaultBaseUrl: 'https://api.anthropic.com/v1/messages',
-    defaultModel: 'claude-sonnet-4-5',
-    storageKey: 'anthropic',
-  },
-  minimax: {
-    defaultBaseUrl: 'https://api.minimaxi.com/anthropic',
-    defaultModel: 'MiniMax-M2.1',
-    storageKey: 'minimax',
-  },
-  deepseek: {
-    defaultBaseUrl: 'https://api.deepseek.com',
-    defaultModel: 'deepseek-chat',
-    storageKey: 'deepseek',
-  },
-  glm: {
-    defaultBaseUrl: 'https://open.bigmodel.cn/api/anthropic',
-    defaultModel: 'glm-4.7',
-    storageKey: 'glm',
-  },
-};
-
-// API request configuration (adjusted per provider)
-const API_CONFIGS: Record<Provider, ProviderApiConfig> = {
-  openai: {
-    endpointPath: '',  // Full path is already included in baseUrl
-    authHeader: 'Bearer',
-    extraHeaders: {},
-  },
-  anthropic: {
-    endpointPath: '',
-    authHeader: 'x-api-key',
-    extraHeaders: { 'anthropic-version': '2023-06-01' },
-  },
-  minimax: {
-    endpointPath: '/v1/messages',
-    authHeader: 'Bearer',
-    extraHeaders: { 'anthropic-version': '2023-06-01' },
-  },
-  deepseek: {
-    endpointPath: '/v1/chat/completions',
-    authHeader: 'Bearer',
-    extraHeaders: {},
-  },
-  glm: {
-    endpointPath: '',
-    authHeader: 'Bearer',
-    extraHeaders: {},
-  },
-};
+import {
+  type Provider,
+  PROVIDER_CONFIGS,
+  DEFAULT_PROVIDER,
+  CONTEXT_MAX_TOKENS,
+  REQUEST_TIMEOUT,
+  clampContextMaxTokens,
+  clampTranslationConcurrency,
+} from '../config';
 
 chrome.runtime.onInstalled.addListener(() => {
   chrome.storage.local.get(['selectedProvider'], (result) => {
     if (!result.selectedProvider) {
-      chrome.storage.local.set({ selectedProvider: 'deepseek' });
+      chrome.storage.local.set({ selectedProvider: DEFAULT_PROVIDER });
     }
   });
 });
@@ -93,10 +31,7 @@ function normalizeOpenAIEndpoint(baseUrl: string): string {
   return `${trimmed}/v1/chat/completions`;
 }
 
-// Maximum context length sent to API (in characters)
-const DEFAULT_CONTEXT_MAX_TOKENS = 5000;
-const MIN_CONTEXT_MAX_TOKENS = 200;
-const MAX_CONTEXT_MAX_TOKENS = 50000;
+import { type DetailLevel, buildExplanationPrompt, getMaxTokensForDetailLevel } from '../utils/explanationPrompt';
 
 // Optimization 1: Config cache - avoid reading storage on every request
 let cachedProviderConfig: {
@@ -106,17 +41,10 @@ let cachedProviderConfig: {
   model: string;
   targetLang: string;
   contextMaxTokens: number;
+  explanationDetailLevel: DetailLevel;
 } | null = null;
 
-const DEFAULT_TRANSLATION_CONCURRENCY = 10;
-const MIN_TRANSLATION_CONCURRENCY = 1;
-const MAX_TRANSLATION_CONCURRENCY = 20;
 let cachedTranslationConcurrency: number | null = null;
-
-function clampContextMaxTokens(value: number): number {
-  if (!Number.isFinite(value)) return DEFAULT_CONTEXT_MAX_TOKENS;
-  return Math.max(MIN_CONTEXT_MAX_TOKENS, Math.min(MAX_CONTEXT_MAX_TOKENS, value));
-}
 
 // Sanitize string for HTTP headers (remove non-ASCII characters)
 function sanitizeForHeader(value: string): string {
@@ -130,7 +58,7 @@ async function getCachedProviderConfig() {
 
   const settings = await chrome.storage.local.get(['selectedProvider']);
 
-  const provider = (settings.selectedProvider as Provider) || 'deepseek';
+  const provider = (settings.selectedProvider as Provider) || DEFAULT_PROVIDER;
   const config = PROVIDER_CONFIGS[provider];
   const storageKey = config.storageKey;
 
@@ -139,12 +67,19 @@ async function getCachedProviderConfig() {
     `${storageKey}BaseUrl`,
     `${storageKey}Model`,
     'targetLanguage',
-    'contextMaxTokens'
+    'contextMaxTokens',
+    'explanationDetailLevel'
   ];
   const providerSettings = await chrome.storage.local.get(allKeys);
 
   const rawContextMaxTokens = providerSettings.contextMaxTokens as number | undefined;
   const contextMaxTokens = clampContextMaxTokens(Number(rawContextMaxTokens));
+
+  const rawDetailLevel = providerSettings.explanationDetailLevel as string | undefined;
+  const explanationDetailLevel: DetailLevel =
+    (rawDetailLevel === 'concise' || rawDetailLevel === 'standard' || rawDetailLevel === 'detailed')
+      ? rawDetailLevel
+      : 'concise';
 
   cachedProviderConfig = {
     provider,
@@ -152,7 +87,8 @@ async function getCachedProviderConfig() {
     baseUrl: (providerSettings[`${storageKey}BaseUrl`] as string) || config.defaultBaseUrl,
     model: (providerSettings[`${storageKey}Model`] as string) || config.defaultModel,
     targetLang: (providerSettings.targetLanguage as string) || (isBrowserChinese() ? '中文' : 'English'),
-    contextMaxTokens
+    contextMaxTokens,
+    explanationDetailLevel
   };
 
   return cachedProviderConfig;
@@ -165,7 +101,7 @@ chrome.storage.onChanged.addListener((changes) => {
     'minimaxApiKey', 'minimaxBaseUrl', 'minimaxModel',
     'deepseekApiKey', 'deepseekBaseUrl', 'deepseekModel',
     'glmApiKey', 'glmBaseUrl', 'glmModel',
-    'targetLanguage', 'contextMaxTokens'];
+    'targetLanguage', 'contextMaxTokens', 'explanationDetailLevel'];
 
   for (const key of relevantKeys) {
     if (changes[key]) {
@@ -176,9 +112,6 @@ chrome.storage.onChanged.addListener((changes) => {
 
   if (changes.translationConcurrency) {
     cachedTranslationConcurrency = null;
-  }
-  if (changes.contextMaxTokens) {
-    cachedProviderConfig = null;
   }
 });
 
@@ -225,7 +158,8 @@ async function buildRequestConfig(payload: QueryPayload): Promise<RequestConfig>
   const baseUrl = cachedConfig.baseUrl;
   const model = cachedConfig.model;
   const targetLang = cachedConfig.targetLang || payload.targetLang || '中文';
-  const contextMaxTokens = cachedConfig.contextMaxTokens || DEFAULT_CONTEXT_MAX_TOKENS;
+  const contextMaxTokens = cachedConfig.contextMaxTokens || CONTEXT_MAX_TOKENS.default;
+  const detailLevel = cachedConfig.explanationDetailLevel || 'concise';
 
   const isChineseUI = payload.uiLang ? payload.uiLang === 'zh' : payload.targetLang !== 'en';
 
@@ -240,36 +174,9 @@ async function buildRequestConfig(payload: QueryPayload): Promise<RequestConfig>
 
   const isChineseTarget = targetLang.startsWith('中文') || targetLang.toLowerCase().startsWith('zh');
 
-  const systemPrompt = isChineseTarget
-    ? `你是一个浏览器划词解释助手。请根据用户选中的内容,结合上下文进行理解,对选中内容进行解释和翻译。
-
-【必须遵守的规则】
-1. 首先输出原文语言标签: <source_lang>xx</source_lang>,xx为语言代码(en/ja/zh/ko/fr/de/es等);
-2. 直接给出解释内容，不要重复或引用原文;
-3. 生成解释时保持回答内容精炼，不要冗长啰嗦;
-4. 必须严格按以下格式输出回答内容;
-   基础含义:
-   xxx
-   上下文中的含义:
-   xxx
-5. 请以陈述句回答;
-6. 用中文回答,按markdown格式美化输出;
-7. 禁止使用代码块、内联代码或HTML标签(例如: \`\`\`、\`code\`、<tag>,但source_lang标签除外)`
-    :
-    `You are a browser selection explanation assistant. Please explain the selected text based on the context and the selected text, give a precise and concise explanation.
-
-【Must follow rules】
-1. First output source language tag: <source_lang>xx</source_lang>, where xx is the language code (en/ja/zh/ko/fr/de/es, etc.);
-2. Provide the explanation directly without repeating or quoting the original text;
-3. Keep your response content concise, avoid verbosity;
-4. You MUST output in the following format only, nothing else:
-   Base meaning: 
-   xxx;
-   Contextual meaning: 
-   xxx;
-5. Answer in a declarative sentence;
-6. Respond in ${targetLang}, beautify the output in markdown format;
-7. Do not use code blocks, inline code, or HTML tags (e.g., \`\`\` or \`code\` or <tag>, except source_lang tag)`;
+  // Build system prompt based on detail level
+  const systemPrompt = buildExplanationPrompt(isChineseTarget, targetLang, detailLevel);
+  const maxTokens = getMaxTokensForDetailLevel(detailLevel);
 
   const userPrompt = `
 <url>${payload.pageUrl || 'unknown'}</url>
@@ -277,7 +184,7 @@ async function buildRequestConfig(payload: QueryPayload): Promise<RequestConfig>
 <context>${contextForApi}</context>
 <selection>${payload.selection}</selection>`;
 
-  const apiConfig = API_CONFIGS[provider];
+  const apiConfig = PROVIDER_CONFIGS[provider];
   const endpoint = provider === 'openai'
     ? normalizeOpenAIEndpoint(baseUrl)
     : `${baseUrl}${apiConfig.endpointPath}`;
@@ -290,7 +197,7 @@ async function buildRequestConfig(payload: QueryPayload): Promise<RequestConfig>
   const requestBody = streamFormat === 'openai'
     ? {
       model: model,
-      max_tokens: 1024,
+      max_tokens: maxTokens,
       temperature: 0.1,
       messages: [
         { role: 'system', content: systemPrompt },
@@ -300,7 +207,7 @@ async function buildRequestConfig(payload: QueryPayload): Promise<RequestConfig>
     }
     : {
       model: model,
-      max_tokens: 1024,
+      max_tokens: maxTokens,
       temperature: 0.1,
       system: systemPrompt,
       messages: [
@@ -360,7 +267,7 @@ async function buildKanaRequestConfig(payload: KanaPayload): Promise<KanaRequest
 
 ${payload.text}`;
 
-  const apiConfig = API_CONFIGS[provider];
+  const apiConfig = PROVIDER_CONFIGS[provider];
   const endpoint = provider === 'openai'
     ? normalizeOpenAIEndpoint(baseUrl)
     : `${baseUrl}${apiConfig.endpointPath}`;
@@ -463,9 +370,6 @@ function parseAnthropicStreamPayload(data: unknown): StreamParseResult {
   }
   return {};
 }
-
-// Optimization 2: API timeout control
-const REQUEST_TIMEOUT = 30000; // 30 seconds
 
 async function handleAIStream(payload: QueryPayload, port: chrome.runtime.Port): Promise<void> {
   const { streamFormat, endpoint, headers, requestBody, isChineseUI } = await buildRequestConfig(payload);
@@ -790,9 +694,7 @@ async function getTranslationConcurrency(): Promise<number> {
 
   const settings = await chrome.storage.local.get(['translationConcurrency']);
   const rawValue = settings.translationConcurrency as number | undefined;
-  const parsed = Number(rawValue);
-  const value = Number.isFinite(parsed) ? parsed : DEFAULT_TRANSLATION_CONCURRENCY;
-  const clamped = Math.max(MIN_TRANSLATION_CONCURRENCY, Math.min(MAX_TRANSLATION_CONCURRENCY, value));
+  const clamped = clampTranslationConcurrency(Number(rawValue));
   cachedTranslationConcurrency = clamped;
   return clamped;
 }
@@ -882,7 +784,7 @@ async function buildInlineTranslateRequestConfig(payload: InlineTranslatePayload
 
 ${payload.selection}`;
 
-  const apiConfig = API_CONFIGS[provider];
+  const apiConfig = PROVIDER_CONFIGS[provider];
   const endpoint = provider === 'openai'
     ? normalizeOpenAIEndpoint(baseUrl)
     : `${baseUrl}${apiConfig.endpointPath}`;
@@ -954,7 +856,7 @@ async function buildInlineTranslateBatchRequestConfig(payload: InlineTranslateBa
 
   const userPrompt = JSON.stringify(payload.selections);
 
-  const apiConfig = API_CONFIGS[provider];
+  const apiConfig = PROVIDER_CONFIGS[provider];
   const endpoint = provider === 'openai'
     ? normalizeOpenAIEndpoint(baseUrl)
     : `${baseUrl}${apiConfig.endpointPath}`;
@@ -1252,7 +1154,7 @@ async function handleTestConnection(payload: any, port: chrome.runtime.Port): Pr
   // Sanitize API key to remove any non-ASCII characters (e.g., invisible Unicode from copy-paste)
   const cleanApiKey = sanitizeForHeader(apiKey);
 
-  const apiConfig = API_CONFIGS[provider as Provider];
+  const apiConfig = PROVIDER_CONFIGS[provider as Provider];
   const endpoint = provider === 'openai'
     ? normalizeOpenAIEndpoint(baseUrl)
     : `${baseUrl}${apiConfig.endpointPath}`;

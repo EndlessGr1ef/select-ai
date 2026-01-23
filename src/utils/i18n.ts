@@ -79,6 +79,12 @@ export const translations = {
     concurrencyHint: { zh: '同时发送翻译请求的最大标签页数量 (1-20)', en: 'Max concurrent translation requests across tabs (1-20)' },
     blacklistToggleLabel: { zh: '启用 CSS 黑名单', en: 'Enable CSS Blacklist' },
     blacklistToggleHint: { zh: '排除页面广告、导航栏等非主要内容区域', en: 'Exclude ads, nav bars and other non-main content areas' },
+    // Explanation detail level
+    explanationDetailLabel: { zh: '解释详细程度', en: 'Explanation Detail Level' },
+    explanationDetailHint: { zh: '控制划词解释内容的详细程度', en: 'Control the detail level of selection explanations' },
+    explanationDetailConcise: { zh: '简洁', en: 'Concise' },
+    explanationDetailStandard: { zh: '标准', en: 'Standard' },
+    explanationDetailDetailed: { zh: '详细', en: 'Detailed' },
   },
   content: {
     loading: { zh: '正在分析上下文...', en: 'Analyzing context...' },
