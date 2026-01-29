@@ -40,8 +40,9 @@ const ContentApp: FC = () => {
     const usableHeight = Math.max(220, Math.floor(height - safeMargin * 2));
     const minWidth = Math.min(320, usableWidth);
     const minHeight = Math.min(260, usableHeight);
-    const maxWidth = Math.max(minWidth, Math.min(860, Math.floor(width * 0.9)));
-    const maxHeight = Math.max(minHeight, Math.min(760, Math.floor(height * 0.8)));
+    // Updated max size: 600x700 for better readability
+    const maxWidth = Math.max(minWidth, Math.min(600, Math.floor(width * 0.55)));
+    const maxHeight = Math.max(minHeight, Math.min(700, Math.floor(height * 0.75)));
     return {
       minWidth,
       minHeight,
@@ -538,9 +539,11 @@ const ContentApp: FC = () => {
     }
   }, [showPanel]);
 
+  // Balanced auto-resize: expand both width and height proportionally
   useEffect(() => {
     if (!showPanel || isResizing || isUserSized) return;
     if (autoResizeRafRef.current) cancelAnimationFrame(autoResizeRafRef.current);
+
     autoResizeRafRef.current = requestAnimationFrame(() => {
       autoResizeRafRef.current = null;
       const scrollContainer = scrollContainerRef.current;
@@ -549,14 +552,35 @@ const ContentApp: FC = () => {
 
       const { minWidth, maxWidth, minHeight, maxHeight } = getPanelConstraints();
       const extraHeight = Math.max(0, scrollContainer.scrollHeight - scrollContainer.clientHeight);
-      const extraWidth = Math.max(0, scrollContainer.scrollWidth - scrollContainer.clientWidth);
 
-      if (extraHeight < 2 && extraWidth < 2) return;
+      // No overflow, no need to resize
+      if (extraHeight < 2) return;
 
-      const nextWidth = clampValue(panelSize.width + extraWidth, minWidth, maxWidth);
-      const nextHeight = clampValue(panelSize.height + extraHeight, minHeight, maxHeight);
+      const currentWidth = panelSize.width;
+      const currentHeight = panelSize.height;
+      const aspectRatio = currentHeight / currentWidth;
 
-      if (nextWidth !== panelSize.width || nextHeight !== panelSize.height) {
+      let nextWidth = currentWidth;
+      let nextHeight = currentHeight;
+
+      // Balanced expansion strategy
+      if (aspectRatio > 1.5 && currentWidth < maxWidth) {
+        // Aspect ratio too tall, prioritize width increase
+        const widthIncrement = Math.min(40, maxWidth - currentWidth);
+        nextWidth = currentWidth + widthIncrement;
+        // Also increase height slightly
+        nextHeight = clampValue(currentHeight + extraHeight * 0.3, minHeight, maxHeight);
+      } else {
+        // Balanced increase of both dimensions
+        const widthIncrement = Math.min(20, extraHeight * 0.3, maxWidth - currentWidth);
+        nextWidth = currentWidth + widthIncrement;
+        nextHeight = clampValue(currentHeight + extraHeight * 0.7, minHeight, maxHeight);
+      }
+
+      nextWidth = clampValue(nextWidth, minWidth, maxWidth);
+      nextHeight = clampValue(nextHeight, minHeight, maxHeight);
+
+      if (nextWidth !== currentWidth || nextHeight !== currentHeight) {
         setPanelSize({ width: nextWidth, height: nextHeight });
       }
     });
@@ -582,10 +606,16 @@ const ContentApp: FC = () => {
       const currentPosition = positionRef.current;
       const rawLeft = currentPosition.x - 20 + currentOffset.x;
       const rawTop = currentPosition.y - window.scrollY + 5 + currentOffset.y;
-      const maxLeft = Math.max(safeMargin, viewportWidth - nextWidth - safeMargin);
-      const maxTop = Math.max(safeMargin, viewportHeight - nextHeight - safeMargin);
-      const clampedLeft = clampValue(rawLeft, safeMargin, maxLeft);
-      const clampedTop = clampValue(rawTop, safeMargin, maxTop);
+      
+      // Allow panel to move partially off-screen, keeping at least 50px visible
+      const minVisiblePart = 50;
+      const minLeft = safeMargin - nextWidth + minVisiblePart;
+      const maxLeft = viewportWidth - minVisiblePart;
+      const minTop = safeMargin;
+      const maxTop = viewportHeight - minVisiblePart;
+      
+      const clampedLeft = clampValue(rawLeft, minLeft, maxLeft);
+      const clampedTop = clampValue(rawTop, minTop, maxTop);
       const nextOffsetX = currentOffset.x + (clampedLeft - rawLeft);
       const nextOffsetY = currentOffset.y + (clampedTop - rawTop);
 
@@ -633,13 +663,18 @@ const ContentApp: FC = () => {
   const { safeMargin, viewportWidth, viewportHeight } = getPanelConstraints();
   const rawPanelLeft = position.x - 20 + dragOffset.x;
   const rawPanelTop = position.y - window.scrollY + 5 + dragOffset.y;
-  const maxPanelLeft = Math.max(safeMargin, viewportWidth - panelSize.width - safeMargin);
-  const maxPanelTop = Math.max(safeMargin, viewportHeight - panelSize.height - safeMargin);
+  
+  // Allow panel to move partially off-screen, keeping at least header visible (50px)
+  const minVisiblePart = 50;
+  const minPanelLeft = safeMargin - panelSize.width + minVisiblePart;
+  const maxPanelLeft = viewportWidth - minVisiblePart;
+  const minPanelTop = safeMargin;
+  const maxPanelTop = viewportHeight - minVisiblePart;
 
   const panelStyle: CSSProperties = {
     position: 'fixed',
-    left: clampValue(rawPanelLeft, safeMargin, maxPanelLeft),
-    top: clampValue(rawPanelTop, safeMargin, maxPanelTop),
+    left: clampValue(rawPanelLeft, minPanelLeft, maxPanelLeft),
+    top: clampValue(rawPanelTop, minPanelTop, maxPanelTop),
     zIndex: 2147483647,
     width: panelSize.width,
     height: panelSize.height,

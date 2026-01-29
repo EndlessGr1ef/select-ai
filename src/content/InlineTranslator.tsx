@@ -1,5 +1,6 @@
-import React, { useState, useEffect, useCallback } from 'react';
+import React, { useState, useEffect, useCallback, useRef } from 'react';
 import { TranslationProvider, useTranslation } from './context/TranslationContext';
+import type { TranslationCacheEntry } from './context/TranslationContext';
 import { FloatingButton, useDraggable } from './components/FloatingButton';
 import { SiteBlacklist } from '../utils/SiteBlacklist';
 import { translations } from '../utils/i18n';
@@ -20,24 +21,68 @@ interface InlineTranslatorProps {
   blacklist: SiteBlacklist;
 }
 
+// Generate a content hash for SPA change detection
+function generateContentHash(): string {
+  const selectors = 'p, h1, h2, h3, h4, h5, h6, li, td, th';
+  const elements = document.querySelectorAll(selectors);
+
+  // Take first 50 elements' text content
+  const contentSample = Array.from(elements)
+    .slice(0, 50)
+    .map(el => el.textContent?.trim().slice(0, 100)) // Limit each element to 100 chars
+    .filter(Boolean)
+    .join('|');
+
+  // Simple hash function
+  let hash = 0;
+  for (let i = 0; i < contentSample.length; i++) {
+    const char = contentSample.charCodeAt(i);
+    hash = ((hash << 5) - hash) + char;
+    hash = hash & hash;
+  }
+  return hash.toString(36);
+}
+
 const InlineTranslatorInner: React.FC<{ blacklist: SiteBlacklist }> = ({ blacklist }) => {
   const {
     targetLang,
     uiLang,
     isTranslating,
-    isTranslated,
     setIsTranslating,
-    setIsTranslated,
-    clearAllTranslations,
-    translationCache,
-    translatedIds,
     abortRef,
+    translationButtonEnabled,
+
+    // Mode and visibility
+    activeMode,
+    isShowingTranslation,
+    setActiveMode,
+    setIsShowingTranslation,
+
+    // Full page
+    fullPageCache,
+    fullPageIds,
+    fullPageContentHash,
+    setFullPageContentHash,
+    hideFullPageTranslations,
+    showFullPageTranslations,
+
+    // Selection
+    addSelectionCache,
+    selectionCacheList,
+    clearSelectionTranslations,
+
+    // Clear all
+    clearAllTranslations,
   } = useTranslation();
 
   const { translate, disconnect } = useTranslationStream();
 
   const [isFullscreen, setIsFullscreen] = useState(false);
   const { isDragging, position, wasDraggingRef, handleDragStart, buttonRef } = useDraggable();
+
+  // Current working cache and ids (for active translation)
+  const currentCacheRef = useRef<Map<string, TranslationCacheEntry>>(new Map());
+  const currentIdsRef = useRef<Set<string>>(new Set());
 
   const t = translations.content;
 
@@ -81,7 +126,6 @@ const InlineTranslatorInner: React.FC<{ blacklist: SiteBlacklist }> = ({ blackli
     container.id = id;
     container.className = `select-ai-translation-container ${useInlineMode ? 'inline-mode' : 'block-mode'}`;
 
-    // 应用通用样式
     Object.assign(container.style, inheritedStyles);
 
     if (useInlineMode) {
@@ -119,7 +163,6 @@ const InlineTranslatorInner: React.FC<{ blacklist: SiteBlacklist }> = ({ blackli
       container.appendChild(loadingSpan);
       container.appendChild(contentSpan);
 
-      // 对于 <a> 标签，翻译容器应该插入到外部而不是内部，避免破坏链接结构
       const tagName = element.tagName.toLowerCase();
       if (tagName === 'a' && element.parentElement) {
         element.parentElement.insertBefore(container, element.nextSibling);
@@ -184,7 +227,6 @@ const InlineTranslatorInner: React.FC<{ blacklist: SiteBlacklist }> = ({ blackli
           element.appendChild(container);
         }
       } else if (isTableCell) {
-        // 表格单元格：将翻译容器作为子元素
         element.appendChild(container);
       } else if (element.parentElement) {
         element.parentElement.insertBefore(container, element.nextSibling);
@@ -224,12 +266,17 @@ const InlineTranslatorInner: React.FC<{ blacklist: SiteBlacklist }> = ({ blackli
     }
     element.removeAttribute('data-select-ai-translated');
     element.removeAttribute('data-select-ai-inline-mode');
+    // Remove from current working cache
+    currentCacheRef.current.delete(id);
+    currentIdsRef.current.delete(id);
   };
 
   const translateElement = async (
     element: Element,
     id: string,
     text: string,
+    cache: Map<string, TranslationCacheEntry>,
+    ids: Set<string>,
     originalHTML?: string
   ): Promise<void> => {
     if (!text) {
@@ -258,14 +305,14 @@ const InlineTranslatorInner: React.FC<{ blacklist: SiteBlacklist }> = ({ blackli
       targetLang,
       uiLang,
       onDelta: (data) => {
-        translationCache.set(id, { text: data, originalHTML, placeholder: placeholderTemplate });
-        translatedIds.add(id);
+        cache.set(id, { text: data, originalHTML, placeholder: placeholderTemplate });
+        ids.add(id);
         updateTranslation(id, data, placeholderTemplate, false);
       },
       onDone: (data) => {
         if (data) {
-          translationCache.set(id, { text: data, originalHTML, placeholder: placeholderTemplate });
-          translatedIds.add(id);
+          cache.set(id, { text: data, originalHTML, placeholder: placeholderTemplate });
+          ids.add(id);
           updateTranslation(id, data, placeholderTemplate, true);
         }
       },
@@ -276,75 +323,13 @@ const InlineTranslatorInner: React.FC<{ blacklist: SiteBlacklist }> = ({ blackli
     });
   };
 
-  const handleInlineTranslate = useCallback(async () => {
-    abortRef.current = false;
-
-    const sel = window.getSelection();
-    const selectedText = sel?.toString().trim();
-
-    let elementsToTranslate: Element[] = [];
-    const textSelectors = getTextSelectors();
-
-    const isElementEligibleWithBlacklist = (el: Element) => {
-      return isElementEligible(el, { blacklist, isBlacklistEnabled: true });
-    };
-
-    if (selectedText && selectedText.length > 0) {
-      const range = sel?.getRangeAt(0);
-      const commonAncestor = range?.commonAncestorContainer;
-      const rootElement = commonAncestor
-        ? (commonAncestor.nodeType === Node.ELEMENT_NODE
-          ? (commonAncestor as Element)
-          : commonAncestor.parentElement)
-        : null;
-
-      if (range && rootElement) {
-        const inRangeElements: Element[] = [];
-        if (rootElement.matches(textSelectors)) {
-          inRangeElements.push(rootElement);
-        }
-
-        const candidates = Array.from(rootElement.querySelectorAll(textSelectors));
-        for (const el of candidates) {
-          try {
-            if (range.intersectsNode(el)) {
-              inRangeElements.push(el);
-            }
-          } catch {
-            // Silently ignore errors from intersectsNode for incompatible node types
-          }
-        }
-
-        const allElements = inRangeElements.filter(isElementEligibleWithBlacklist);
-        elementsToTranslate = ContentPriority.sortByVisibility(allElements);
-      }
-
-      if (elementsToTranslate.length === 0) {
-        let node = sel?.anchorNode;
-        while (node && node.nodeType === Node.TEXT_NODE) {
-          node = node.parentElement;
-        }
-        if (node && node instanceof Element && isElementEligibleWithBlacklist(node)) {
-          elementsToTranslate = [node];
-        }
-      }
-    } else {
-      const allElements = Array.from(document.querySelectorAll(textSelectors))
-        .filter(isElementEligibleWithBlacklist);
-      elementsToTranslate = ContentPriority.sortByVisibility(allElements);
-    }
-
-    if (elementsToTranslate.length === 0) {
-      alert(t.noSelection[uiLang]);
-      return;
-    }
-
-    // Filter out nested elements to avoid duplicate translations
-    elementsToTranslate = filterVisibleElements(elementsToTranslate);
-
-    if (elementsToTranslate.length === 0) {
-      return;
-    }
+  // Translate elements and store in provided cache
+  const doTranslate = useCallback(async (
+    elementsToTranslate: Element[],
+    cache: Map<string, TranslationCacheEntry>,
+    ids: Set<string>
+  ) => {
+    // Inject styles if needed
     const style = document.createElement('style');
     style.textContent = `
       @keyframes select-ai-spin {
@@ -408,13 +393,148 @@ const InlineTranslatorInner: React.FC<{ blacklist: SiteBlacklist }> = ({ blackli
       element.setAttribute('data-select-ai-translated', 'true');
       element.setAttribute('data-select-ai-inline-mode', useInlineMode ? 'true' : 'false');
 
-      allPromises.push(translateElement(element, id, text, item.originalHTML));
+      allPromises.push(translateElement(element, id, text, cache, ids, item.originalHTML));
     }
 
-    Promise.allSettled(allPromises).then(() => {
+    await Promise.allSettled(allPromises);
+    setIsTranslating(false);
+  }, [targetLang, uiLang, abortRef, setIsTranslating]);
+
+  // Handle full page translation
+  const handleFullPageTranslate = useCallback(async () => {
+    abortRef.current = false;
+
+    const textSelectors = getTextSelectors();
+    const isElementEligibleWithBlacklist = (el: Element) => {
+      return isElementEligible(el, { blacklist, isBlacklistEnabled: true });
+    };
+
+    const allElements = Array.from(document.querySelectorAll(textSelectors))
+      .filter(isElementEligibleWithBlacklist);
+    let elementsToTranslate = ContentPriority.sortByVisibility(allElements);
+    elementsToTranslate = filterVisibleElements(elementsToTranslate);
+
+    if (elementsToTranslate.length === 0) {
+      alert(t.noSelection[uiLang]);
       setIsTranslating(false);
-    });
-  }, [blacklist, targetLang, uiLang, abortRef, translationCache, translatedIds]);
+      return;
+    }
+
+    // Check content hash for SPA detection
+    const currentHash = generateContentHash();
+    const hashChanged = currentHash !== fullPageContentHash;
+
+    // If we have cache and hash is same, just show cached translations
+    if (fullPageCache.size > 0 && !hashChanged) {
+      showFullPageTranslations();
+      setActiveMode('fullPage');
+      setIsShowingTranslation(true);
+      setIsTranslating(false);
+      return;
+    }
+
+    // Content changed or no cache - need to re-translate
+    // Clear old full page translations first
+    if (fullPageIds.size > 0) {
+      fullPageIds.forEach(id => {
+        const container = document.getElementById(id);
+        if (container) {
+          const parent = container.parentElement;
+          if (parent) {
+            parent.removeAttribute('data-select-ai-translated');
+            parent.removeAttribute('data-select-ai-inline-mode');
+          }
+          container.remove();
+        }
+      });
+      fullPageIds.clear();
+      fullPageCache.clear();
+    }
+
+    // Update content hash
+    setFullPageContentHash(currentHash);
+
+    // Store refs for the translation
+    currentCacheRef.current = fullPageCache;
+    currentIdsRef.current = fullPageIds;
+
+    await doTranslate(elementsToTranslate, fullPageCache, fullPageIds);
+
+    setActiveMode('fullPage');
+    setIsShowingTranslation(true);
+  }, [blacklist, uiLang, abortRef, fullPageCache, fullPageIds, fullPageContentHash, setFullPageContentHash, showFullPageTranslations, setActiveMode, setIsShowingTranslation, setIsTranslating, doTranslate, t]);
+
+  // Handle selection translation
+  const handleSelectionTranslate = useCallback(async () => {
+    abortRef.current = false;
+
+    const sel = window.getSelection();
+    const textSelectors = getTextSelectors();
+    const isElementEligibleWithBlacklist = (el: Element) => {
+      return isElementEligible(el, { blacklist, isBlacklistEnabled: true });
+    };
+
+    const range = sel?.getRangeAt(0);
+    const commonAncestor = range?.commonAncestorContainer;
+    const rootElement = commonAncestor
+      ? (commonAncestor.nodeType === Node.ELEMENT_NODE
+        ? (commonAncestor as Element)
+        : commonAncestor.parentElement)
+      : null;
+
+    let elementsToTranslate: Element[] = [];
+
+    if (range && rootElement) {
+      const inRangeElements: Element[] = [];
+      if (rootElement.matches(textSelectors)) {
+        inRangeElements.push(rootElement);
+      }
+
+      const candidates = Array.from(rootElement.querySelectorAll(textSelectors));
+      for (const el of candidates) {
+        try {
+          if (range.intersectsNode(el)) {
+            inRangeElements.push(el);
+          }
+        } catch {
+          // Silently ignore
+        }
+      }
+
+      const allElements = inRangeElements.filter(isElementEligibleWithBlacklist);
+      elementsToTranslate = ContentPriority.sortByVisibility(allElements);
+    }
+
+    if (elementsToTranslate.length === 0) {
+      let node = sel?.anchorNode;
+      while (node && node.nodeType === Node.TEXT_NODE) {
+        node = node.parentElement;
+      }
+      if (node && node instanceof Element && isElementEligibleWithBlacklist(node)) {
+        elementsToTranslate = [node];
+      }
+    }
+
+    elementsToTranslate = filterVisibleElements(elementsToTranslate);
+
+    if (elementsToTranslate.length === 0) {
+      alert(t.noSelection[uiLang]);
+      setIsTranslating(false);
+      return;
+    }
+
+    // Create new selection cache entry (will auto-remove oldest if > 5)
+    const { cache, ids } = addSelectionCache();
+
+    // Store refs for the translation
+    currentCacheRef.current = cache;
+    currentIdsRef.current = ids;
+
+    await doTranslate(elementsToTranslate, cache, ids);
+
+    setActiveMode('selection');
+    setIsShowingTranslation(true);
+  }, [blacklist, uiLang, abortRef, addSelectionCache, setActiveMode, setIsShowingTranslation, setIsTranslating, doTranslate, t]);
 
   const handleButtonClick = useCallback(() => {
     if (isDragging || wasDraggingRef.current) {
@@ -422,41 +542,84 @@ const InlineTranslatorInner: React.FC<{ blacklist: SiteBlacklist }> = ({ blackli
       return;
     }
 
+    // If currently translating, abort
     if (isTranslating) {
       abortRef.current = true;
       setIsTranslating(false);
       return;
     }
-    if (isTranslated && translatedIds.size > 0) {
-      clearAllTranslations();
-      setIsTranslated(false);
-    } else {
-      const sel = window.getSelection();
-      const selectedText = sel?.toString().trim();
 
-      if (selectedText && selectedText.length > 0) {
-        clearAllTranslations();
-        setIsTranslating(true);
-        handleInlineTranslate();
-        setIsTranslated(true);
-      } else {
-        if (translationCache.size > 0) {
-          translatedIds.forEach(id => {
-            const container = document.getElementById(id);
-            if (container) {
-              container.style.display = container.classList.contains('inline-mode') ? 'inline' : 'block';
-              setTimeout(() => container.classList.add('show'), 10);
-            }
-          });
-          setIsTranslated(true);
+    const sel = window.getSelection();
+    const selectedText = sel?.toString().trim();
+    const hasSelection = selectedText && selectedText.length > 0;
+
+    // Check if there are any translations on page
+    const hasAnyTranslations = fullPageIds.size > 0 || selectionCacheList.some(entry => entry.ids.size > 0);
+
+    if (hasSelection) {
+      // Selection translation mode
+      // Check if selected elements are already translated
+      const range = sel?.getRangeAt(0);
+      const commonAncestor = range?.commonAncestorContainer;
+      const rootElement = commonAncestor
+        ? (commonAncestor.nodeType === Node.ELEMENT_NODE
+          ? (commonAncestor as Element)
+          : commonAncestor.parentElement)
+        : null;
+
+      let hasTranslatedElements = false;
+      if (rootElement) {
+        // Check if root element or any child has translation
+        if (rootElement.hasAttribute('data-select-ai-translated')) {
+          hasTranslatedElements = true;
         } else {
-          setIsTranslating(true);
-          handleInlineTranslate();
-          setIsTranslated(true);
+          const translatedChildren = rootElement.querySelectorAll('[data-select-ai-translated]');
+          if (translatedChildren.length > 0) {
+            // Check if any translated element intersects with selection
+            for (const el of translatedChildren) {
+              try {
+                if (range?.intersectsNode(el)) {
+                  hasTranslatedElements = true;
+                  break;
+                }
+              } catch {
+                // Ignore
+              }
+            }
+          }
         }
       }
+
+      if (hasTranslatedElements) {
+        // Clear selection translations (toggle off)
+        clearSelectionTranslations();
+      } else {
+        // Hide full page translations (but keep cache)
+        if (activeMode === 'fullPage' && isShowingTranslation) {
+          hideFullPageTranslations();
+        }
+
+        setIsTranslating(true);
+        handleSelectionTranslate();
+      }
+    } else {
+      // No selection: toggle between translate all / clear all
+      if (hasAnyTranslations) {
+        // Clear all translations
+        clearAllTranslations();
+      } else {
+        // No translations, start full page translation
+        setIsTranslating(true);
+        handleFullPageTranslate();
+      }
     }
-  }, [isDragging, isTranslating, isTranslated, translatedIds, translationCache, abortRef, clearAllTranslations, handleInlineTranslate, setIsTranslating, setIsTranslated]);
+  }, [
+    isDragging, isTranslating, activeMode, isShowingTranslation,
+    fullPageIds, selectionCacheList, abortRef,
+    hideFullPageTranslations, clearAllTranslations, clearSelectionTranslations,
+    handleFullPageTranslate, handleSelectionTranslate,
+    setIsTranslating
+  ]);
 
   const handleMouseOver = (e: React.MouseEvent) => {
     if (!isTranslating && !isDragging) {
@@ -473,6 +636,11 @@ const InlineTranslatorInner: React.FC<{ blacklist: SiteBlacklist }> = ({ blackli
       target.style.boxShadow = '0 2px 8px rgba(139, 92, 246, 0.5)';
     }
   };
+
+  // If translation button is disabled in options, don't render anything
+  if (!translationButtonEnabled) {
+    return null;
+  }
 
   return (
     <>
