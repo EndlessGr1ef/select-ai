@@ -4,6 +4,9 @@ import { ContextExtractor } from '../utils/ContextExtractor';
 import { containsKanji, getUILanguage, isLikelyJapanese } from '../utils/language';
 import { translations } from '../utils/i18n';
 
+// Get extension icon URL for content script context
+const appIconUrl = chrome.runtime.getURL('app-icon.png');
+
 type Provider = 'openai' | 'anthropic' | 'minimax' | 'deepseek' | 'glm';
 type PanelLayoutMode = 'auto' | 'user';
 
@@ -1310,20 +1313,16 @@ const ContentApp: FC = () => {
           />
 
           <div style={headerStyle} onMouseDown={handleDragStart}>
-            <div style={{
-              width: 28,
-              height: 28,
-              backgroundColor: '#ec4899',
-              borderRadius: 8,
-              display: 'flex',
-              alignItems: 'center',
-              justifyContent: 'center',
-              color: '#fff',
-              fontSize: 14,
-              fontWeight: 600
-            }}>
-              AI
-            </div>
+            <img
+              src={appIconUrl}
+              alt="Select AI"
+              style={{
+                width: 28,
+                height: 28,
+                borderRadius: 8,
+                objectFit: 'contain',
+              }}
+            />
 
             <div style={modelBadgeStyle}>
               <span style={{

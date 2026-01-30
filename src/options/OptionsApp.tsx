@@ -42,7 +42,7 @@ const OptionsApp: FC = () => {
   const [translationButtonEnabled, setTranslationButtonEnabled] = useState(true);
   const [kanaRubyEnabled, setKanaRubyEnabled] = useState(true);
   const [contextMaxTokens, setContextMaxTokens] = useState<number>(CONTEXT_MAX_TOKENS.default);
-  const [explanationDetailLevel, setExplanationDetailLevel] = useState<'concise' | 'standard' | 'detailed'>('concise');
+  const [explanationDetailLevel, setExplanationDetailLevel] = useState<'concise' | 'standard' | 'detailed'>('standard');
   const [isTesting, setIsTesting] = useState(false);
   const [testStatus, setTestStatus] = useState<{ type: 'success' | 'error' | 'idle', message: string }>({ type: 'idle', message: '' });
 

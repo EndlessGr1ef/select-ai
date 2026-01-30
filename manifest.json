@@ -37,5 +37,15 @@
   ],
   "host_permissions": [
     "<all_urls>"
+  ],
+  "web_accessible_resources": [
+    {
+      "resources": [
+        "app-icon.png"
+      ],
+      "matches": [
+        "<all_urls>"
+      ]
+    }
   ]
 }

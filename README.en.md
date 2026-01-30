@@ -64,15 +64,15 @@ Build generates `dist/` and `select-ai.zip`. Load `dist/` in Chrome or unzip `se
 | Feature | Description | Use Case |
 |---------|-------------|----------|
 | 🎯 **Smart Selection** | Floating button appears on text selection, click to query | Get instant explanations |
-| 🧠 **Context Awareness** | Auto-extract context (default 5000, adjustable 200-500000) | Technical terms, complex sentences |
+| 🧠 **Context Awareness** | Auto-extract context (default 5000, adjustable 200-50000) | Technical terms, complex sentences |
+| 📊 **Detail Level** | Choose concise/standard/detailed explanations | Quick scan or deep learning |
 | 🚀 **Streaming Output** | Stream responses in real time as they are generated | Get answers faster |
 | 🌐 **Multi-language** | Supports Chinese, English, Japanese, Korean output | Foreign language reading & learning |
 | 🇯🇵 **Kana Ruby** | Show kana above Japanese kanji (ruby) | Japanese reading & learning |
 | 🔌 **Multi-API Support** | MiniMax / OpenAI / Anthropic / DeepSeek / Zhipu AI / Custom API | Flexible deployment, self-hosted services |
 | 🔊 **Text-to-Speech** | Read original text and translation aloud | Listening & shadowing |
 | 🔒 **Privacy First** | API keys stored locally, no user data collection | Secure usage |
-| 📄 **Full Page Translation** | Auto-detect content, batch translate entire page | Foreign language websites |
-| ✂️ **Selected Text** | Translate only selected text or paragraphs | Precise translation needs |
+| 📄 **Bilingual Mode** | Original + translation side-by-side, full page or selection | Foreign language websites |
 | ⚡ **Concurrent Translation** | Multi-paragraph parallel translation with loading states | Batch translation |
 | 🧪 **Connection Test** | One-click API test in settings | Validate configuration fast |
 | ⚙️ **Fine-grained Settings** | Translation button, CSS blacklist, concurrency, context length | Fit different scenarios |

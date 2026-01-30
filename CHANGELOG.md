@@ -1,15 +1,26 @@
 # Changelog / 更新日志
 
-## [0.3.4] - 2026-01-21
+## [0.4.0] - 2026-01-30
 
 ### Added / 新增
+- Explanation detail level option (concise/standard/detailed) / 解释详细程度选项（简洁/标准/详细）
 - API connection test in settings / 设置页新增 API 连接测试
+- Zip build script for distribution / 新增 zip 打包脚本
 
 ### Changed / 改进
-- Improved language detection and response formatting / 优化语言检测与回答格式
-- Show error messages directly in results / 错误信息直接展示在结果中
+- Enhanced panel auto-positioning with better viewport handling / 优化面板自动定位，更好处理视口边界
+- Added hover delay for trigger dot / 触发点增加悬停延迟
+- Improved drag and resize behavior / 改进拖拽和调整大小行为
+- Replaced text badge with app icon in panel header / 面板头部文字徽章替换为应用图标
+- Updated application icons / 更新应用图标
+- Increased context token limits (default 5000, max 50000) / 提高上下文 token 限制（默认 5000，最大 50000）
+- Refactored config module to src/config directory / 配置模块重构到 src/config 目录
+- Refactored translation panel sizing and selection logic / 重构翻译面板尺寸和选择逻辑
+- Improved language detection / 优化语言检测
+- Updated documentation / 更新文档
 
 ### Fixed / 修复
+- Sanitized API keys to prevent HTTP header issues with non-ASCII characters / 清理 API 密钥非 ASCII 字符，防止 HTTP 头问题
 - Safe postMessage handling for port disconnects / 断开连接时的消息发送保护
 
 ---
