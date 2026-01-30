@@ -1,62 +1,24 @@
 import { useState, useEffect } from 'react'
-import './App.css'
-import { getUILanguage } from './utils/language'
-import { translations } from './utils/i18n'
+import './PopupApp.css'
+import { getUILanguage } from '../utils/language'
+import { translations } from '../utils/i18n'
 import {
   Settings,
   CheckCircle2,
   AlertCircle
 } from 'lucide-react'
-import { icons } from './resource'
+import { icons } from '../resource'
+import { type Provider, PROVIDER_CONFIGS, DEFAULT_PROVIDER } from '../config'
 
-type Provider = 'openai' | 'anthropic' | 'minimax' | 'deepseek' | 'glm';
-
-interface ProviderConfig {
-  defaultBaseUrl: string;
-  defaultModel: string;
-  storageKey: string;
-}
-
-const PROVIDER_CONFIGS: Record<Provider, ProviderConfig> = {
-  openai: {
-    defaultBaseUrl: 'https://api.openai.com/v1/chat/completions',
-    defaultModel: 'gpt-4o',
-    storageKey: 'openai',
-  },
-  anthropic: {
-    defaultBaseUrl: 'https://api.anthropic.com/v1/messages',
-    defaultModel: 'claude-sonnet-4-5',
-    storageKey: 'anthropic',
-  },
-  minimax: {
-    defaultBaseUrl: 'https://api.minimaxi.com/anthropic',
-    defaultModel: 'MiniMax-M2.1',
-    storageKey: 'minimax',
-  },
-  deepseek: {
-    defaultBaseUrl: 'https://api.deepseek.com',
-    defaultModel: 'deepseek-chat',
-    storageKey: 'deepseek',
-  },
-  glm: {
-    defaultBaseUrl: 'https://open.bigmodel.cn/api/anthropic',
-    defaultModel: 'glm-4.7',
-    storageKey: 'glm',
-  },
-};
-
-function App() {
+function PopupApp() {
   const [isConfigured, setIsConfigured] = useState(false);
   const [providerName, setProviderName] = useState('');
   const [modelName, setModelName] = useState('');
   const [lang, setLang] = useState<'zh' | 'en'>('zh');
 
-  const providerNames: Record<Provider, { zh: string; en: string }> = {
-    openai: { zh: 'OpenAI', en: 'OpenAI' },
-    anthropic: { zh: 'Anthropic', en: 'Anthropic' },
-    minimax: { zh: 'MiniMax', en: 'MiniMax' },
-    deepseek: { zh: 'DeepSeek', en: 'DeepSeek' },
-    glm: { zh: '智谱 AI', en: 'Zhipu AI' },
+  const getProviderDisplayName = (provider: Provider, language: 'zh' | 'en'): string => {
+    const config = PROVIDER_CONFIGS[provider];
+    return config?.name?.[language] || provider;
   };
 
   useEffect(() => {
@@ -66,8 +28,9 @@ function App() {
   useEffect(() => {
     if (typeof chrome !== 'undefined' && chrome.storage) {
       chrome.storage.local.get(['selectedProvider'], async (result) => {
-        const selectedProvider = (result.selectedProvider as Provider) || 'deepseek';
+        const selectedProvider = (result.selectedProvider as Provider) || DEFAULT_PROVIDER;
         const config = PROVIDER_CONFIGS[selectedProvider];
+        if (!config) return;
         const storageKey = config.storageKey;
 
         const settings = await chrome.storage.local.get([
@@ -79,7 +42,7 @@ function App() {
 
         if (apiKey) {
           setIsConfigured(true);
-          setProviderName(providerNames[selectedProvider][lang]);
+          setProviderName(getProviderDisplayName(selectedProvider, lang));
           setModelName(model || config.defaultModel);
         }
       });
@@ -326,4 +289,4 @@ function App() {
   );
 }
 
-export default App
+export default PopupApp
