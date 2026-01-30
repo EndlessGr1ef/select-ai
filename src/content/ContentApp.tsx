@@ -5,6 +5,7 @@ import { containsKanji, getUILanguage, isLikelyJapanese } from '../utils/languag
 import { translations } from '../utils/i18n';
 
 type Provider = 'openai' | 'anthropic' | 'minimax' | 'deepseek' | 'glm';
+type PanelLayoutMode = 'auto' | 'user';
 
 const ContentApp: FC = () => {
   const [selection, setSelection] = useState<string>('');
@@ -67,6 +68,7 @@ const ContentApp: FC = () => {
   const [isResizing, setIsResizing] = useState(false);
   const [resizeDirection, setResizeDirection] = useState<'n' | 's' | 'e' | 'w' | 'ne' | 'nw' | 'se' | 'sw' | null>(null);
   const [isUserSized, setIsUserSized] = useState(false);
+  const [isUserMoved, setIsUserMoved] = useState(false);
   const resizeStartRef = useRef<{ mouseX: number; mouseY: number; startWidth: number; startHeight: number; startX: number; startY: number } | null>(null);
 
   // Drag state for panel repositioning
@@ -88,7 +90,12 @@ const ContentApp: FC = () => {
   const dragOffsetRef = useRef(dragOffset);
   const positionRef = useRef(position);
   const showPanelRef = useRef(showPanel);
+  const selectionRectRef = useRef<{ height: number } | null>(null);
+  const isUserSizedRef = useRef(isUserSized);
+  const isUserMovedRef = useRef(isUserMoved);
   const voicesLoadedRef = useRef(false);
+  // Ref for hover delay timer to prevent accidental trigger
+  const hoverTimerRef = useRef<number | null>(null);
 
   const t = translations.content;
 
@@ -134,6 +141,14 @@ const ContentApp: FC = () => {
   useEffect(() => {
     showPanelRef.current = showPanel;
   }, [showPanel]);
+
+  useEffect(() => {
+    isUserSizedRef.current = isUserSized;
+  }, [isUserSized]);
+
+  useEffect(() => {
+    isUserMovedRef.current = isUserMoved;
+  }, [isUserMoved]);
 
   const defaultModels: Record<Provider, string> = {
     minimax: 'MiniMax-M2.1',
@@ -227,8 +242,14 @@ const ContentApp: FC = () => {
 
   // Drag handlers for panel repositioning
   const handleDragStart = (e: ReactMouseEvent) => {
+    // Ignore if target is a button (close button)
+    const target = e.target as HTMLElement;
+    if (target.tagName === 'BUTTON' || target.closest('button')) {
+      return;
+    }
     e.preventDefault();
     setIsDragging(true);
+    setIsUserMoved(true);
     dragStartRef.current = {
       mouseX: e.clientX,
       mouseY: e.clientY,
@@ -273,6 +294,7 @@ const ContentApp: FC = () => {
     setIsResizing(true);
     setResizeDirection(direction);
     setIsUserSized(true);
+    setIsUserMoved(true);
 
     const panelRect = panelRef.current?.getBoundingClientRect();
     if (!panelRect) return;
@@ -345,12 +367,32 @@ const ContentApp: FC = () => {
   useEffect(() => {
     const selectionIdleDelay = 400;
 
+    const isSelectionInsideOverlay = (sel: Selection | null) => {
+      if (!sel) return false;
+      const overlayRoot = document.getElementById('ai-selection-search-root');
+      if (!overlayRoot) return false;
+      const anchorNode = sel.anchorNode;
+      const focusNode = sel.focusNode;
+      return (
+        (anchorNode && overlayRoot.contains(anchorNode)) ||
+        (focusNode && overlayRoot.contains(focusNode))
+      );
+    };
+
     const updateFromSelection = () => {
       if (isResizing || isDragging) return;
       const sel = window.getSelection();
+      // Ignore selections inside extension overlay to avoid panel reposition
+      if (isSelectionInsideOverlay(sel)) return;
+      // Do not react to new page selections while panel is open
+      if (showPanelRef.current) {
+        setShowDot(false);
+        return;
+      }
       if (!sel || sel.rangeCount === 0) {
         setShowDot(false);
         if (!loading && !showPanelRef.current) setShowPanel(false);
+        selectionRectRef.current = null;
         return;
       }
 
@@ -358,6 +400,7 @@ const ContentApp: FC = () => {
       if (!text) {
         setShowDot(false);
         if (!loading && !showPanelRef.current) setShowPanel(false);
+        selectionRectRef.current = null;
         return;
       }
 
@@ -383,6 +426,9 @@ const ContentApp: FC = () => {
       if (!rect || (rect.width === 0 && rect.height === 0)) {
         if (lastPointerRef.current) {
           setSelection(text);
+          selectionRectRef.current = {
+            height: 0,
+          };
           setPosition({
             x: lastPointerRef.current.x + window.scrollX,
             y: lastPointerRef.current.y + window.scrollY,
@@ -394,6 +440,9 @@ const ContentApp: FC = () => {
       }
 
       setSelection(text);
+      selectionRectRef.current = {
+        height: rect.height || 0,
+      };
       setPosition({
         x: rect.left + window.scrollX,
         y: rect.top + window.scrollY,
@@ -417,11 +466,15 @@ const ContentApp: FC = () => {
       if (dotRef.current?.contains(e.target as Node) || panelRef.current?.contains(e.target as Node)) {
         return;
       }
+      if (showPanelRef.current) return;
       lastPointerRef.current = { x: e.clientX, y: e.clientY };
       scheduleSelectionUpdate();
     };
 
     const handleSelectionChange = () => {
+      const sel = window.getSelection();
+      if (isSelectionInsideOverlay(sel)) return;
+      if (showPanelRef.current) return;
       scheduleSelectionUpdate();
     };
 
@@ -436,7 +489,39 @@ const ContentApp: FC = () => {
     };
   }, [loading, isResizing, isDragging]);
 
+  // Hover delay handlers to prevent accidental triggers when mouse passes over dot
+  const handleDotMouseEnter = () => {
+    // Clear any existing timer
+    if (hoverTimerRef.current) {
+      window.clearTimeout(hoverTimerRef.current);
+    }
+    // Start delay timer - only trigger if mouse stays on dot for 100ms
+    hoverTimerRef.current = window.setTimeout(() => {
+      hoverTimerRef.current = null;
+      handleTriggerQuery();
+    }, 100);
+  };
+
+  const handleDotMouseLeave = () => {
+    // Cancel trigger if mouse leaves before delay completes
+    if (hoverTimerRef.current) {
+      window.clearTimeout(hoverTimerRef.current);
+      hoverTimerRef.current = null;
+    }
+  };
+
+  const handleCloseMouseDown = (e: ReactMouseEvent) => {
+    e.preventDefault();
+    e.stopPropagation();
+    setShowPanel(false);
+  };
+
   const handleTriggerQuery = async () => {
+    // Clear hover timer when triggered
+    if (hoverTimerRef.current) {
+      window.clearTimeout(hoverTimerRef.current);
+      hoverTimerRef.current = null;
+    }
     setShowDot(false);
     setShowPanel(true);
     setLoading(true);
@@ -445,8 +530,16 @@ const ContentApp: FC = () => {
     setKanaLoading(false);
     setIsTextExpanded(false);
     setDragOffset({ x: 0, y: 0 });
-    setPanelSize(getDefaultPanelSize());
+    const defaultSize = getDefaultPanelSize();
+    const initialLayout = getPanelLayout({
+      position: positionRef.current,
+      dragOffset: { x: 0, y: 0 },
+      panelSize: defaultSize,
+      mode: 'auto',
+    });
+    setPanelSize({ width: defaultSize.width, height: initialLayout.height });
     setIsUserSized(false);
+    setIsUserMoved(false);
     setSourceLang(null);
     disconnectKanaStreamPort();
 
@@ -539,6 +632,62 @@ const ContentApp: FC = () => {
     }
   }, [showPanel]);
 
+  const getPanelLayout = (input: {
+    position: { x: number; y: number };
+    dragOffset: { x: number; y: number };
+    panelSize: { width: number; height: number };
+    mode: PanelLayoutMode;
+  }) => {
+    const { safeMargin, viewportWidth, viewportHeight } = getPanelConstraints();
+    const selectionGap = 8;
+    const selectionTop = input.position.y - window.scrollY;
+    const selectionHeight = selectionRectRef.current?.height ?? 0;
+    const selectionBottom = selectionTop + selectionHeight;
+
+    let nextHeight = input.panelSize.height;
+    let baseTop = selectionBottom + selectionGap;
+
+    if (input.mode === 'auto') {
+      const spaceAbove = Math.max(0, selectionTop - safeMargin);
+      const spaceBelow = Math.max(0, viewportHeight - selectionBottom - selectionGap - safeMargin);
+
+      if (spaceBelow < nextHeight && spaceAbove >= nextHeight) {
+        baseTop = selectionTop - selectionGap - nextHeight;
+      } else if (spaceBelow < nextHeight) {
+        const preferAbove = spaceAbove >= spaceBelow;
+        const availableSpace = preferAbove ? spaceAbove : spaceBelow;
+        nextHeight = Math.max(0, Math.min(nextHeight, availableSpace));
+        baseTop = preferAbove
+          ? selectionTop - selectionGap - nextHeight
+          : selectionBottom + selectionGap;
+      }
+    }
+
+    const rawLeft = input.position.x - 20 + input.dragOffset.x;
+    const rawTop = baseTop + input.dragOffset.y;
+    const minVisiblePart = 50;
+
+    const minLeft = input.mode === 'auto'
+      ? safeMargin
+      : safeMargin - input.panelSize.width + minVisiblePart;
+    const maxLeft = input.mode === 'auto'
+      ? Math.max(minLeft, viewportWidth - safeMargin - input.panelSize.width)
+      : viewportWidth - minVisiblePart;
+
+    const minTop = safeMargin;
+    const maxTop = input.mode === 'auto'
+      ? Math.max(minTop, viewportHeight - safeMargin - nextHeight)
+      : viewportHeight - minVisiblePart;
+
+    return {
+      left: clampValue(rawLeft, minLeft, maxLeft),
+      top: clampValue(rawTop, minTop, maxTop),
+      height: nextHeight,
+      rawLeft,
+      rawTop,
+    };
+  };
+
   // Balanced auto-resize: expand both width and height proportionally
   useEffect(() => {
     if (!showPanel || isResizing || isUserSized) return;
@@ -580,44 +729,49 @@ const ContentApp: FC = () => {
       nextWidth = clampValue(nextWidth, minWidth, maxWidth);
       nextHeight = clampValue(nextHeight, minHeight, maxHeight);
 
-      if (nextWidth !== currentWidth || nextHeight !== currentHeight) {
-        setPanelSize({ width: nextWidth, height: nextHeight });
+      const mode: PanelLayoutMode = isUserMoved ? 'user' : 'auto';
+      const layout = getPanelLayout({
+        position: positionRef.current,
+        dragOffset: dragOffsetRef.current,
+        panelSize: { width: nextWidth, height: nextHeight },
+        mode,
+      });
+      const finalHeight = mode === 'auto' ? layout.height : nextHeight;
+
+      if (nextWidth !== currentWidth || finalHeight !== currentHeight) {
+        setPanelSize({ width: nextWidth, height: finalHeight });
       }
     });
 
     return () => {
       if (autoResizeRafRef.current) cancelAnimationFrame(autoResizeRafRef.current);
     };
-  }, [result, loading, isTextExpanded, showPanel, isResizing, isUserSized, panelSize]);
+  }, [result, loading, isTextExpanded, showPanel, isResizing, isUserSized, isUserMoved, panelSize]);
 
   useEffect(() => {
     const handleViewportResize = () => {
       if (!showPanelRef.current) return;
-      const { minWidth, maxWidth, minHeight, maxHeight, safeMargin, viewportWidth, viewportHeight } = getPanelConstraints();
+      const { minWidth, maxWidth, maxHeight } = getPanelConstraints();
       const currentSize = panelSizeRef.current;
       const nextWidth = clampValue(currentSize.width, minWidth, maxWidth);
-      const nextHeight = clampValue(currentSize.height, minHeight, maxHeight);
-
-      if (nextWidth !== currentSize.width || nextHeight !== currentSize.height) {
-        setPanelSize({ width: nextWidth, height: nextHeight });
-      }
+      const nextHeight = Math.min(currentSize.height, maxHeight);
 
       const currentOffset = dragOffsetRef.current;
       const currentPosition = positionRef.current;
-      const rawLeft = currentPosition.x - 20 + currentOffset.x;
-      const rawTop = currentPosition.y - window.scrollY + 5 + currentOffset.y;
-      
-      // Allow panel to move partially off-screen, keeping at least 50px visible
-      const minVisiblePart = 50;
-      const minLeft = safeMargin - nextWidth + minVisiblePart;
-      const maxLeft = viewportWidth - minVisiblePart;
-      const minTop = safeMargin;
-      const maxTop = viewportHeight - minVisiblePart;
-      
-      const clampedLeft = clampValue(rawLeft, minLeft, maxLeft);
-      const clampedTop = clampValue(rawTop, minTop, maxTop);
-      const nextOffsetX = currentOffset.x + (clampedLeft - rawLeft);
-      const nextOffsetY = currentOffset.y + (clampedTop - rawTop);
+      const mode: PanelLayoutMode = (!isUserSizedRef.current && !isUserMovedRef.current) ? 'auto' : 'user';
+      const layout = getPanelLayout({
+        position: currentPosition,
+        dragOffset: currentOffset,
+        panelSize: { width: nextWidth, height: nextHeight },
+        mode,
+      });
+
+      if (nextWidth !== currentSize.width || layout.height !== currentSize.height) {
+        setPanelSize({ width: nextWidth, height: layout.height });
+      }
+
+      const nextOffsetX = currentOffset.x + (layout.left - layout.rawLeft);
+      const nextOffsetY = currentOffset.y + (layout.top - layout.rawTop);
 
       if (nextOffsetX !== currentOffset.x || nextOffsetY !== currentOffset.y) {
         setDragOffset({ x: nextOffsetX, y: nextOffsetY });
@@ -637,10 +791,15 @@ const ContentApp: FC = () => {
     return () => {
       disconnectStreamPort();
       disconnectKanaStreamPort();
+      // Clean up hover timer on unmount
+      if (hoverTimerRef.current) {
+        window.clearTimeout(hoverTimerRef.current);
+      }
     };
   }, []);
 
   // Styles
+  // Dot always positioned at top-left of selection
   const dotStyle: CSSProperties = {
     position: 'fixed',
     left: position.x,
@@ -660,24 +819,37 @@ const ContentApp: FC = () => {
     transition: 'transform 0.15s',
   };
 
-  const { safeMargin, viewportWidth, viewportHeight } = getPanelConstraints();
-  const rawPanelLeft = position.x - 20 + dragOffset.x;
-  const rawPanelTop = position.y - window.scrollY + 5 + dragOffset.y;
-  
-  // Allow panel to move partially off-screen, keeping at least header visible (50px)
-  const minVisiblePart = 50;
-  const minPanelLeft = safeMargin - panelSize.width + minVisiblePart;
-  const maxPanelLeft = viewportWidth - minVisiblePart;
-  const minPanelTop = safeMargin;
-  const maxPanelTop = viewportHeight - minVisiblePart;
+  const allowAutoPlacement = !isDragging && !isResizing && !isUserSized && !isUserMoved;
+  const panelLayout = getPanelLayout({
+    position,
+    dragOffset,
+    panelSize,
+    mode: allowAutoPlacement ? 'auto' : 'user',
+  });
+
+  useEffect(() => {
+    if (!showPanel || isResizing || isDragging || isUserSized || isUserMoved) return;
+    if (panelLayout.height !== panelSize.height) {
+      setPanelSize({ width: panelSize.width, height: panelLayout.height });
+    }
+  }, [
+    showPanel,
+    isResizing,
+    isDragging,
+    isUserSized,
+    isUserMoved,
+    panelLayout.height,
+    panelSize.width,
+    panelSize.height,
+  ]);
 
   const panelStyle: CSSProperties = {
     position: 'fixed',
-    left: clampValue(rawPanelLeft, minPanelLeft, maxPanelLeft),
-    top: clampValue(rawPanelTop, minPanelTop, maxPanelTop),
+    left: panelLayout.left,
+    top: panelLayout.top,
     zIndex: 2147483647,
     width: panelSize.width,
-    height: panelSize.height,
+    height: panelLayout.height,
     backgroundColor: '#fff',
     borderRadius: 16,
     boxShadow: '0 10px 40px rgba(0,0,0,0.15)',
@@ -1092,7 +1264,8 @@ const ContentApp: FC = () => {
         <div
           ref={dotRef}
           style={dotStyle}
-          onMouseEnter={handleTriggerQuery}
+          onMouseEnter={handleDotMouseEnter}
+          onMouseLeave={handleDotMouseLeave}
         >
           <div style={dotInnerStyle} />
         </div>
@@ -1165,6 +1338,7 @@ const ContentApp: FC = () => {
             <button
               style={closeButtonStyle}
               onClick={() => setShowPanel(false)}
+              onMouseDown={handleCloseMouseDown}
               onMouseOver={(e) => (e.currentTarget.style.color = '#374151')}
               onMouseOut={(e) => (e.currentTarget.style.color = '#9ca3af')}
             >
