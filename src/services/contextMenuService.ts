@@ -2,15 +2,8 @@
 
 import { ocrService } from './ocrService';
 
-interface ImageInfo {
-  imageElement: HTMLImageElement;
-  imageUrl: string;
-  imageBlob: Blob;
-}
-
 class ContextMenuService {
   private menuId = 'select-ai-ocr-menu';
-  private recognizeId = 'select-ai-ocr-recognize';
   private translateId = 'select-ai-ocr-translate';
   private explainId = 'select-ai-ocr-explain';
 

@@ -1,7 +1,7 @@
 {
   "name": "select-ai",
   "private": true,
-  "version": "0.4.0",
+  "version": "0.4.1",
   "type": "module",
   "scripts": {
     "dev": "pnpm exec node scripts/update-version.js && vite",
@@ -13,7 +13,8 @@
     "opencode-ai": "^1.1.25",
     "react": "^19.2.0",
     "react-dom": "^19.2.0",
-    "react-markdown": "^10.1.0"
+    "react-markdown": "^10.1.0",
+    "tesseract.js": "^5.1.1"
   },
   "devDependencies": {
     "@crxjs/vite-plugin": "2.0.0-beta.33",

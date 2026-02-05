@@ -23,7 +23,7 @@ function getDefaultTargetLanguage(): string {
   return isBrowserChinese() ? '中文' : 'English';
 }
 
-import OCRSettings from './OCRSettings';
+import OCRSettingsComponent from './OCRSettings';
 
 type TabType = 'api' | 'translation' | 'ocr';
 
@@ -775,7 +775,7 @@ const OptionsApp: FC = () => {
           )}
 
           {activeTab === 'ocr' && (
-            <OCRSettings
+            <OCRSettingsComponent
               ocrEnabled={ocrEnabled}
               ocrLanguages={ocrLanguages}
               onSave={(settings) => {

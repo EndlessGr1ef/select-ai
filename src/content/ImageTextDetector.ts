@@ -69,7 +69,7 @@ class ImageTextDetector {
     }
 
     // Check if selection is inside an image
-    const imageInfo = this.getSelectedImageInfo(selection!);
+    const imageInfo = await this.getSelectedImageInfo(selection!);
     if (!imageInfo) {
       this.hidePopup();
       return;
@@ -122,9 +122,9 @@ class ImageTextDetector {
   }
 
   // Get image info from selection
-  private getSelectedImageInfo(selection: Selection): ImageInfo | null {
+  private getSelectedImageInfo(selection: Selection): Promise<ImageInfo | null> {
     const anchorNode = selection.anchorNode;
-    if (!anchorNode) return null;
+    if (!anchorNode) return Promise.resolve(null);
 
     // Method 1: Find parent img element
     let element: Node | null = anchorNode;
@@ -150,7 +150,7 @@ class ImageTextDetector {
       }
     }
 
-    return null;
+    return Promise.resolve(null);
   }
 
   // Create ImageInfo from img element
@@ -369,7 +369,7 @@ class ImageTextDetector {
   }
 
   // Handle translate action
-  private handleTranslate(text: string, ocrResult?: OCRResult): void {
+  private handleTranslate(text: string, _ocrResult?: OCRResult): void {
     window.postMessage({
       type: 'select-ai-translate',
       text,
