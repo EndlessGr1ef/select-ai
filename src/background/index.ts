@@ -1203,3 +1203,36 @@ async function handleTestConnection(payload: any, port: chrome.runtime.Port): Pr
     port.postMessage({ type: 'error', error: (error as Error).message || String(error) });
   }
 }
+
+// OCR Context Menu Management
+import { contextMenuService } from '../services/contextMenuService';
+
+chrome.runtime.onInstalled.addListener(async () => {
+  // Create context menus after loading settings
+  const settings = await chrome.storage.local.get(['ocr_enabled']);
+  if (settings.ocr_enabled !== false) {
+    await contextMenuService.createMenus();
+  }
+});
+
+// Listen for OCR settings changes
+chrome.storage.onChanged.addListener(async (changes) => {
+  if (changes.ocr_enabled) {
+    if (changes.ocr_enabled.newValue) {
+      await contextMenuService.createMenus();
+    } else {
+      contextMenuService.destroy();
+    }
+  }
+});
+
+// Handle messages for context menu control
+chrome.runtime.onMessage.addListener((message, sender, sendResponse) => {
+  if (message.action === 'create-context-menu') {
+    contextMenuService.createMenus().then(() => sendResponse({ success: true })).catch(err => sendResponse({ error: err.message }));
+    return true;
+  } else if (message.action === 'clear-context-menu') {
+    contextMenuService.destroy();
+    sendResponse({ success: true });
+  }
+});

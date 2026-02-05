@@ -23,7 +23,9 @@ function getDefaultTargetLanguage(): string {
   return isBrowserChinese() ? '中文' : 'English';
 }
 
-type TabType = 'api' | 'translation';
+import OCRSettings from './OCRSettings';
+
+type TabType = 'api' | 'translation' | 'ocr';
 
 const OptionsApp: FC = () => {
   const [activeTab, setActiveTab] = useState<TabType>('api');
@@ -46,9 +48,12 @@ const OptionsApp: FC = () => {
   const [isTesting, setIsTesting] = useState(false);
   const [testStatus, setTestStatus] = useState<{ type: 'success' | 'error' | 'idle', message: string }>({ type: 'idle', message: '' });
 
+  const [ocrEnabled, setOcrEnabled] = useState(false);
+  const [ocrLanguages, setOcrLanguages] = useState<string[]>(['jpn', 'eng']);
+
   useEffect(() => {
     setLang(getUILanguage());
-    chrome.storage.local.get(['selectedProvider', 'targetLanguage', 'translationConcurrency', 'translationBlacklistEnabled', 'translationButtonEnabled', 'kanaRubyEnabled', 'contextMaxTokens', 'explanationDetailLevel'], (result) => {
+    chrome.storage.local.get(['selectedProvider', 'targetLanguage', 'translationConcurrency', 'translationBlacklistEnabled', 'translationButtonEnabled', 'kanaRubyEnabled', 'contextMaxTokens', 'explanationDetailLevel', 'ocr_enabled', 'ocr_languages'], (result) => {
       if (result.selectedProvider) {
         setProvider(result.selectedProvider as Provider);
       }
@@ -62,6 +67,10 @@ const OptionsApp: FC = () => {
       if (rawDetailLevel === 'concise' || rawDetailLevel === 'standard' || rawDetailLevel === 'detailed') {
         setExplanationDetailLevel(rawDetailLevel);
       }
+
+      // Load OCR settings
+      setOcrEnabled(result.ocr_enabled !== false);
+      setOcrLanguages((result.ocr_languages as string[]) || ['jpn', 'eng']);
 
       setIsLoading(false);
     });
@@ -96,7 +105,9 @@ const OptionsApp: FC = () => {
       translationButtonEnabled,
       kanaRubyEnabled,
       contextMaxTokens,
-      explanationDetailLevel
+      explanationDetailLevel,
+      ocr_enabled: ocrEnabled,
+      ocr_languages: ocrLanguages
     }, () => {
       setStatus({ type: 'success', message: t.saveSuccess[lang] });
       setTimeout(() => setStatus({ type: 'idle', message: '' }), 3000);
@@ -467,6 +478,13 @@ const OptionsApp: FC = () => {
               <Globe2 size={16} strokeWidth={2} />
               {t.tabTranslationSettings[lang]}
             </button>
+            <button
+              style={getTabStyle(activeTab === 'ocr')}
+              onClick={() => setActiveTab('ocr')}
+            >
+              <span>📷</span>
+              图片识别
+            </button>
           </div>
         </div>
 
@@ -754,6 +772,21 @@ const OptionsApp: FC = () => {
                 <p style={{ ...hintStyle, marginLeft: 30 }}>{t.blacklistToggleHint[lang]}</p>
               </div>
             </div>
+          )}
+
+          {activeTab === 'ocr' && (
+            <OCRSettings
+              ocrEnabled={ocrEnabled}
+              ocrLanguages={ocrLanguages}
+              onSave={(settings) => {
+                setOcrEnabled(settings.ocrEnabled);
+                setOcrLanguages(settings.ocrLanguages);
+                chrome.storage.local.set({
+                  ocr_enabled: settings.ocrEnabled,
+                  ocr_languages: settings.ocrLanguages
+                });
+              }}
+            />
           )}
 
           <button
