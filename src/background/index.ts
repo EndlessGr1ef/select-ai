@@ -1227,7 +1227,7 @@ chrome.storage.onChanged.addListener(async (changes) => {
 });
 
 // Handle messages for context menu control
-chrome.runtime.onMessage.addListener((message, sender, sendResponse) => {
+chrome.runtime.onMessage.addListener((message, _sender, sendResponse) => {
   if (message.action === 'create-context-menu') {
     contextMenuService.createMenus().then(() => sendResponse({ success: true })).catch(err => sendResponse({ error: err.message }));
     return true;

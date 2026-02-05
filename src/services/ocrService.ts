@@ -38,34 +38,30 @@ class OCRService {
   private initialized = false;
   private defaultLanguages: string[] = ['jpn', 'eng', 'chs'];
 
+  // Logger type for Tesseract.js
+  private createLogger(): (m: Tesseract.LoggerMessage) => void {
+    return (m) => {
+      if (m.status === 'recognizing text' && m.progress !== undefined) {
+        console.log(`[OCR] 识别进度: ${Math.round(m.progress * 100)}%`);
+      }
+    };
+  }
+
   // Initialize Tesseract worker
   async init(): Promise<void> {
     if (this.initialized) return;
 
-    this.worker = await Tesseract.createWorker({
-      logger: (m) => {
-        if (m.status === 'recognizing text') {
-          console.log(`[OCR] 识别进度: ${Math.round(m.progress * 100)}%`);
-        }
-      },
-    });
-
+    console.log('[OCR] Initializing Tesseract worker...');
     this.initialized = true;
-    console.log('[OCR] Tesseract worker initialized');
   }
 
   // Load and initialize a language
   async loadLanguage(langId: string): Promise<void> {
-    if (!this.worker) await this.init();
-
     const tessLang = LANG_MAP[langId];
     if (!tessLang) {
       throw new Error(`Unknown language: ${langId}`);
     }
 
-    await this.worker!.loadLanguage(tessLang);
-    await this.worker!.initialize(tessLang);
-    
     // Mark as downloaded
     await chrome.storage.local.set({ [`ocr_lang_${langId}_downloaded`]: true });
     console.log(`[OCR] Language ${langId} loaded successfully`);
@@ -87,8 +83,6 @@ class OCRService {
     imageSource: File | Blob | string,
     languages?: string[]
   ): Promise<OCRResult> {
-    if (!this.worker) await this.init();
-
     const langs = languages || this.defaultLanguages;
     const combinedLang = langs
       .map(lang => LANG_MAP[lang])
@@ -97,29 +91,35 @@ class OCRService {
 
     console.log(`[OCR] Recognizing with languages: ${combinedLang}`);
 
-    const result = await this.worker!.recognize(imageSource, {
-      logger: (m) => {
-        if (m.status === 'recognizing text') {
-          console.log(`[OCR] 识别中: ${Math.round(m.progress * 100)}%`);
-        }
-      },
+    // Create worker with language
+    const worker = await Tesseract.createWorker(combinedLang, 1, {
+      logger: this.createLogger(),
     });
 
-    const words = result.data.words?.map(w => ({
-      text: w.text,
-      bbox: {
-        x0: w.bbox.x0,
-        y0: w.bbox.y0,
-        x1: w.bbox.x1,
-        y1: w.bbox.y1,
-      },
-    })) || [];
+    try {
+      const result = await worker.recognize(imageSource);
 
-    return {
-      text: result.data.text.trim(),
-      confidence: result.data.confidence,
-      words,
-    };
+      const words = result.data.words?.map((w) => ({
+        text: w.text,
+        bbox: {
+          x0: w.bbox.x0,
+          y0: w.bbox.y0,
+          x1: w.bbox.x1,
+          y1: w.bbox.y1,
+        },
+      })) || [];
+
+      await worker.terminate();
+
+      return {
+        text: result.data.text.trim(),
+        confidence: result.data.confidence,
+        words,
+      };
+    } catch (error) {
+      await worker.terminate();
+      throw error;
+    }
   }
 
   // Get list of available languages
@@ -139,7 +139,7 @@ class OCRService {
     ]);
 
     return {
-      ocrEnabled: result[STORAGE_KEYS.OCR_ENABLED] ?? false,
+      ocrEnabled: (result[STORAGE_KEYS.OCR_ENABLED] as boolean) ?? false,
       ocrLanguages: (result[STORAGE_KEYS.OCR_LANGUAGES] as string[]) ?? ['jpn', 'eng'],
     };
   }
@@ -159,14 +159,14 @@ class OCRService {
       canvas.width = imgElement.naturalWidth;
       canvas.height = imgElement.naturalHeight;
       const ctx = canvas.getContext('2d');
-      
+
       if (!ctx) {
         reject(new Error('Cannot get canvas context'));
         return;
       }
 
       ctx.drawImage(imgElement, 0, 0);
-      
+
       canvas.toBlob(
         (blob) => {
           if (blob) {
