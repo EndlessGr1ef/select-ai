@@ -10,10 +10,7 @@
   },
   "permissions": [
     "storage",
-    "activeTab",
-    "contextMenus",
-    "notifications",
-    "clipboardWrite"
+    "activeTab"
   ],
   "action": {
     "default_popup": "index.html",
