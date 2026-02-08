@@ -1,7 +1,7 @@
 // OCR Settings Tab - Options page for OCR configuration
 
 import React, { useState, useEffect, type FC } from 'react';
-import { ocrService, type OCRSettings } from '../services/ocrService';
+import { ocrService, type OCRSettings } from '../../services/ocrService';
 
 interface OCRSettingsProps {
   ocrEnabled: boolean;
@@ -9,7 +9,7 @@ interface OCRSettingsProps {
   onSave: (settings: OCRSettings) => void;
 }
 
-const OCRSettingsComponent: FC<OCRSettingsProps> = ({ ocrEnabled: initialEnabled, ocrLanguages: initialLanguages, onSave }) => {
+const OCRSettings: FC<OCRSettingsProps> = ({ ocrEnabled: initialEnabled, ocrLanguages: initialLanguages, onSave }) => {
   const [ocrEnabled, setOcrEnabled] = useState(initialEnabled);
   const [ocrLanguages, setOcrLanguages] = useState<string[]>(initialLanguages);
   const [downloading, setDownloading] = useState<string | null>(null);
@@ -40,10 +40,10 @@ const OCRSettingsComponent: FC<OCRSettingsProps> = ({ ocrEnabled: initialEnabled
 
     // Enable/disable context menu
     if (enabled) {
-      const { contextMenuService } = await import('../services/contextMenuService');
+      const { contextMenuService } = await import('../../services/contextMenuService');
       await contextMenuService.createMenus();
     } else {
-      const { contextMenuService } = await import('../services/contextMenuService');
+      const { contextMenuService } = await import('../../services/contextMenuService');
       contextMenuService.destroy();
     }
   };
@@ -262,7 +262,7 @@ const OCRSettingsComponent: FC<OCRSettingsProps> = ({ ocrEnabled: initialEnabled
           </p>
 
           <div style={langListStyle}>
-            {languages.map((lang: { id: string; name: string; size: string }) => {
+            {languages.map(lang => {
               const isDownloaded = downloadedLangs[lang.id];
               const isDownloading = downloading === lang.id;
               const isChecked = ocrLanguages.includes(lang.id);
@@ -318,4 +318,4 @@ const OCRSettingsComponent: FC<OCRSettingsProps> = ({ ocrEnabled: initialEnabled
   );
 };
 
-export default OCRSettingsComponent;
+export default OCRSettings;
