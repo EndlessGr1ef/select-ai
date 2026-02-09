@@ -46,7 +46,8 @@ ${rules.rule3}
 ${rules.rule4}
 5. 请以陈述句回答;
 6. 用中文回答,按markdown格式美化输出;
-7. 禁止使用代码块、内联代码或HTML标签(例如: \`\`\`、\`code\`、<tag>,但source_lang标签除外)`;
+7. 禁止使用代码块、内联代码或HTML标签(例如: \`\`\`、\`code\`、<tag>,但source_lang标签除外);
+8. 当输入包含<image_content>标签时,说明用户选中的是图片中通过OCR识别出的文字,请优先对图片中的文字内容进行识别、翻译和解释,将其作为主要分析对象`;
   } else {
     // English prompts
     const detailRules: Record<DetailLevel, { rule3: string; rule4: string }> = {
@@ -90,7 +91,8 @@ ${rules.rule3}
 ${rules.rule4}
 5. Answer in a declarative sentence;
 6. Respond in ${targetLang}, beautify the output in markdown format;
-7. Do not use code blocks, inline code, or HTML tags (e.g., \`\`\` or \`code\` or <tag>, except source_lang tag)`;
+7. Do not use code blocks, inline code, or HTML tags (e.g., \`\`\` or \`code\` or <tag>, except source_lang tag);
+8. When the input contains a <image_content> tag, it means the user selected text from an image via OCR. Prioritize recognizing, translating, and explaining the image text content as the primary subject of analysis`;
   }
 }
 

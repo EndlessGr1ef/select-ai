@@ -4,6 +4,13 @@ import { ContextExtractor } from '../utils/ContextExtractor';
 import { containsKanji, getUILanguage, isLikelyJapanese } from '../utils/language';
 import { translations } from '../utils/i18n';
 
+// Augment Window for OCR coordination flag (set by ImageTextDetector)
+declare global {
+  interface Window {
+    __selectAI_ocrActive?: boolean;
+  }
+}
+
 // Get extension icon URL for content script context
 const appIconUrl = chrome.runtime.getURL('app-icon.png');
 
@@ -442,6 +449,9 @@ const ContentApp: FC = () => {
         return;
       }
 
+      // If OCR ImageTextDetector is handling this selection, suppress the dot
+      if (window.__selectAI_ocrActive) return;
+
       setSelection(text);
       selectionRectRef.current = {
         height: rect.height || 0,
@@ -519,12 +529,25 @@ const ContentApp: FC = () => {
     setShowPanel(false);
   };
 
-  const handleTriggerQuery = async () => {
+  // Trigger AI query; optional overrides for OCR/context-menu text
+  const handleTriggerQuery = async (overrides?: { text: string; context: string; imageText?: string }) => {
     // Clear hover timer when triggered
     if (hoverTimerRef.current) {
       window.clearTimeout(hoverTimerRef.current);
       hoverTimerRef.current = null;
     }
+
+    const queryText = overrides?.text ?? selection;
+    if (overrides?.text) {
+      setSelection(overrides.text);
+      // Position panel at upper-center of viewport for OCR results
+      const { width, height } = getViewportBounds();
+      const ocrPos = { x: width / 2 + window.scrollX, y: height / 3 + window.scrollY };
+      setPosition(ocrPos);
+      positionRef.current = ocrPos;
+      selectionRectRef.current = { height: 0 };
+    }
+
     setShowDot(false);
     setShowPanel(true);
     setLoading(true);
@@ -547,7 +570,7 @@ const ContentApp: FC = () => {
     disconnectKanaStreamPort();
 
     const sel = window.getSelection();
-    const context = sel ? ContextExtractor.getContext(sel, contextMaxTokens) : '';
+    const context = overrides?.context ?? (sel ? ContextExtractor.getContext(sel, contextMaxTokens) : '');
     const pageUrl = window.location.href;
     const pageTitle = document.title;
 
@@ -558,7 +581,10 @@ const ContentApp: FC = () => {
     }
 
     try {
-      const payload = { selection, context, pageUrl, pageTitle, targetLang, uiLang: lang };
+      const payload = {
+        selection: queryText, context, pageUrl, pageTitle, targetLang, uiLang: lang,
+        ...(overrides?.imageText ? { imageText: overrides.imageText } : {}),
+      };
 
       disconnectStreamPort();
       const port = chrome.runtime.connect({ name: 'ai-stream' });
@@ -592,7 +618,7 @@ const ContentApp: FC = () => {
 
       port.postMessage({ action: 'queryAIStream', payload });
 
-      if (shouldRequestKana(selection, getLocalContextFromSelection(sel))) {
+      if (shouldRequestKana(queryText, overrides?.context || getLocalContextFromSelection(sel))) {
         setKanaLoading(true);
         const kanaPort = chrome.runtime.connect({ name: 'ai-kana-stream' });
         kanaStreamPortRef.current = kanaPort;
@@ -614,7 +640,7 @@ const ContentApp: FC = () => {
           setKanaLoading(false);
         });
 
-        kanaPort.postMessage({ action: 'queryKana', payload: { text: selection, uiLang: lang } });
+        kanaPort.postMessage({ action: 'queryKana', payload: { text: queryText, uiLang: lang } });
       }
       return;
     } catch (e) {
@@ -787,6 +813,46 @@ const ContentApp: FC = () => {
     return () => {
       window.removeEventListener('resize', handleViewportResize);
       window.visualViewport?.removeEventListener('resize', handleViewportResize);
+    };
+  }, []);
+
+  // Stable ref to latest handleTriggerQuery for use in event listeners
+  const handleTriggerQueryRef = useRef(handleTriggerQuery);
+  useEffect(() => {
+    handleTriggerQueryRef.current = handleTriggerQuery;
+  });
+
+  // Listen for OCR and context-menu events dispatched from ImageTextDetector / index.tsx
+  useEffect(() => {
+    const handleOCRTranslate = (e: Event) => {
+      const detail = (e as CustomEvent).detail;
+      if (!detail?.text) return;
+      handleTriggerQueryRef.current({ text: detail.text, context: detail.context || '' });
+    };
+    const handleOCRExplain = (e: Event) => {
+      const detail = (e as CustomEvent).detail;
+      if (!detail?.text) return;
+      handleTriggerQueryRef.current({ text: detail.text, context: detail.context || '' });
+    };
+    // Unified image explain event from context menu OCR
+    const handleImageExplain = (e: Event) => {
+      const detail = (e as CustomEvent).detail;
+      if (!detail?.imageText) return;
+      handleTriggerQueryRef.current({
+        text: detail.imageText,
+        context: '',
+        imageText: detail.imageText,
+      });
+    };
+
+    window.addEventListener('select-ai-translate-text', handleOCRTranslate);
+    window.addEventListener('select-ai-explain-text', handleOCRExplain);
+    window.addEventListener('select-ai-image-explain', handleImageExplain);
+
+    return () => {
+      window.removeEventListener('select-ai-translate-text', handleOCRTranslate);
+      window.removeEventListener('select-ai-explain-text', handleOCRExplain);
+      window.removeEventListener('select-ai-image-explain', handleImageExplain);
     };
   }, []);
 

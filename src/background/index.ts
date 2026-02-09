@@ -124,6 +124,7 @@ type QueryPayload = {
   pageTitle?: string;
   targetLang?: string;
   uiLang?: 'zh' | 'en';
+  imageText?: string;
 };
 
 type KanaPayload = {
@@ -178,10 +179,14 @@ async function buildRequestConfig(payload: QueryPayload): Promise<RequestConfig>
   const systemPrompt = buildExplanationPrompt(isChineseTarget, targetLang, detailLevel);
   const maxTokens = getMaxTokensForDetailLevel(detailLevel);
 
+  const imageTag = payload.imageText
+    ? `\n<image_content>${payload.imageText}</image_content>`
+    : '';
+
   const userPrompt = `
 <url>${payload.pageUrl || 'unknown'}</url>
 <title>${payload.pageTitle || 'unknown'}</title>
-<context>${contextForApi}</context>
+<context>${contextForApi}</context>${imageTag}
 <selection>${payload.selection}</selection>`;
 
   const apiConfig = PROVIDER_CONFIGS[provider];
