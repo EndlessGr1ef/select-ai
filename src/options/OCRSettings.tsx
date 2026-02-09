@@ -13,6 +13,8 @@ const OCRSettingsComponent: FC<OCRSettingsProps> = ({ ocrEnabled: initialEnabled
   const [ocrEnabled, setOcrEnabled] = useState(initialEnabled);
   const [ocrLanguages, setOcrLanguages] = useState<string[]>(initialLanguages);
   const [downloading, setDownloading] = useState<string | null>(null);
+  const [downloadStatus, setDownloadStatus] = useState<string>('');
+  const [downloadError, setDownloadError] = useState<string | null>(null);
   const [downloadedLangs, setDownloadedLangs] = useState<Record<string, boolean>>({});
 
   const languages = ocrService.getAvailableLanguages();
@@ -57,16 +59,23 @@ const OCRSettingsComponent: FC<OCRSettingsProps> = ({ ocrEnabled: initialEnabled
     onSave({ ocrEnabled, ocrLanguages: newLanguages });
   };
 
-  // Download language pack
+  // Download language pack with status feedback
   const handleDownload = async (langId: string) => {
     setDownloading(langId);
+    setDownloadStatus('准备中...');
+    setDownloadError(null);
     try {
-      await ocrService.downloadLanguage(langId);
+      await ocrService.downloadLanguage(
+        langId,
+        (status) => setDownloadStatus(status),
+      );
       setDownloadedLangs(prev => ({ ...prev, [langId]: true }));
-      setDownloading(null);
     } catch (error) {
       console.error(`Failed to download ${langId}:`, error);
+      setDownloadError(`下载失败: ${error instanceof Error ? error.message : String(error)}`);
+    } finally {
       setDownloading(null);
+      setDownloadStatus('');
     }
   };
 
@@ -228,6 +237,14 @@ const OCRSettingsComponent: FC<OCRSettingsProps> = ({ ocrEnabled: initialEnabled
 
   return (
     <div style={containerStyle}>
+      {/* Indeterminate progress bar animation */}
+      <style>{`
+        @keyframes ocr-progress-slide {
+          0% { left: -40%; }
+          100% { left: 100%; }
+        }
+      `}</style>
+
       {/* Title */}
       <div style={sectionTitleStyle}>
         <span style={{ fontSize: 18 }}>📷</span>
@@ -268,37 +285,76 @@ const OCRSettingsComponent: FC<OCRSettingsProps> = ({ ocrEnabled: initialEnabled
               const isChecked = ocrLanguages.includes(lang.id);
 
               return (
-                <label key={lang.id} style={langItemStyle}>
-                  <input
-                    type="checkbox"
-                    checked={isChecked}
-                    onChange={(e) => handleLanguageToggle(lang.id, e.target.checked)}
-                    style={langCheckboxStyle}
-                  />
-                  <div style={langInfoStyle}>
-                    <span style={langNameStyle}>{lang.name}</span>
-                    <span style={langSizeStyle}>{lang.size}</span>
-                  </div>
-                  {isDownloaded && (
-                    <span style={badgeStyle}>✓ 已缓存</span>
+                <div key={lang.id}>
+                  <label style={langItemStyle}>
+                    <input
+                      type="checkbox"
+                      checked={isChecked}
+                      onChange={(e) => handleLanguageToggle(lang.id, e.target.checked)}
+                      style={langCheckboxStyle}
+                    />
+                    <div style={langInfoStyle}>
+                      <span style={langNameStyle}>{lang.name}</span>
+                      <span style={langSizeStyle}>
+                        {isDownloading ? downloadStatus : lang.size}
+                      </span>
+                    </div>
+                    {isDownloaded && (
+                      <span style={badgeStyle}>✓ 已缓存</span>
+                    )}
+                    {!isDownloaded && !isDownloading && (
+                      <button
+                        style={{
+                          ...downloadBtnStyle,
+                          opacity: downloading !== null ? 0.5 : 1,
+                          cursor: downloading !== null ? 'not-allowed' : 'pointer',
+                        }}
+                        onClick={(e) => { e.preventDefault(); handleDownload(lang.id); }}
+                        disabled={downloading !== null}
+                      >
+                        下载
+                      </button>
+                    )}
+                  </label>
+                  {isDownloading && (
+                    <div style={{ padding: '0 16px 12px', marginTop: -4 }}>
+                      <div style={{
+                        height: 4,
+                        backgroundColor: '#e2e8f0',
+                        borderRadius: 2,
+                        overflow: 'hidden',
+                        position: 'relative' as const,
+                      }}>
+                        {/* Indeterminate animated progress bar */}
+                        <div style={{
+                          position: 'absolute' as const,
+                          height: '100%',
+                          width: '40%',
+                          backgroundColor: '#8b5cf6',
+                          borderRadius: 2,
+                          animation: 'ocr-progress-slide 1.5s ease-in-out infinite',
+                        }} />
+                      </div>
+                    </div>
                   )}
-                  {!isDownloaded && (
-                    <button
-                      style={{
-                        ...downloadBtnStyle,
-                        opacity: isDownloading ? 0.7 : 1,
-                        cursor: isDownloading ? 'not-allowed' : 'pointer',
-                      }}
-                      onClick={() => handleDownload(lang.id)}
-                      disabled={isDownloading}
-                    >
-                      {isDownloading ? '下载中...' : '下载'}
-                    </button>
-                  )}
-                </label>
+                </div>
               );
             })}
           </div>
+
+          {downloadError && !downloading && (
+            <div style={{
+              marginTop: 12,
+              padding: '10px 14px',
+              backgroundColor: '#fef2f2',
+              border: '1px solid #fecaca',
+              borderRadius: 8,
+              fontSize: 13,
+              color: '#dc2626',
+            }}>
+              {downloadError}
+            </div>
+          )}
         </div>
       )}
 

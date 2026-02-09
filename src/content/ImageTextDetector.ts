@@ -31,6 +31,14 @@ interface OCRResult {
   }>;
 }
 
+// Global flag to indicate OCR is handling the current selection
+// ContentApp checks this to avoid showing duplicate floating dot
+declare global {
+  interface Window {
+    __selectAI_ocrActive?: boolean;
+  }
+}
+
 class ImageTextDetector {
   private selectionChangeHandler: () => void;
   private popup: HTMLElement | null = null;
@@ -62,9 +70,10 @@ class ImageTextDetector {
     const selection = window.getSelection();
     const selectedText = selection?.toString().trim();
 
-    // If no selection, hide popup
+    // If no selection, hide popup and clear flag
     if (!selectedText) {
       this.hidePopup();
+      window.__selectAI_ocrActive = false;
       return;
     }
 
@@ -72,8 +81,12 @@ class ImageTextDetector {
     const imageInfo = await this.getSelectedImageInfo(selection!);
     if (!imageInfo) {
       this.hidePopup();
+      window.__selectAI_ocrActive = false;
       return;
     }
+
+    // Set flag to suppress ContentApp's floating dot
+    window.__selectAI_ocrActive = true;
 
     // Show loading popup
     this.showPopup({
@@ -121,33 +134,47 @@ class ImageTextDetector {
     }
   }
 
-  // Get image info from selection
+  // Get image info from selection — only if the selection is tightly associated with an image.
+  // We deliberately avoid walking up to <body>/<html> to prevent false positives on any page
+  // that contains images.
   private getSelectedImageInfo(selection: Selection): Promise<ImageInfo | null> {
     const anchorNode = selection.anchorNode;
     if (!anchorNode) return Promise.resolve(null);
 
-    // Method 1: Find parent img element
-    let element: Node | null = anchorNode;
-    while (element) {
+    // Method 1: The anchor node itself IS an <img> (e.g. user clicked on img alt text)
+    if (anchorNode.nodeType === Node.ELEMENT_NODE && (anchorNode as Element).tagName === 'IMG') {
+      const img = anchorNode as HTMLImageElement;
+      if (img.complete && img.naturalWidth > 0) {
+        return this.createImageInfo(img);
+      }
+    }
+
+    // Method 2: Walk up at most 3 levels from the anchor, looking for a tightly-scoped
+    // image container (figure, picture, .image-wrapper, .image-container) that contains an <img>.
+    // Stop early at section-level boundaries to avoid matching unrelated images.
+    const STOP_TAGS = new Set(['BODY', 'HTML', 'MAIN', 'ARTICLE', 'SECTION', 'NAV', 'ASIDE', 'HEADER', 'FOOTER']);
+    const MAX_LEVELS = 3;
+    let element: Node | null = anchorNode.parentNode;
+    for (let depth = 0; element && depth < MAX_LEVELS; depth++) {
       if (element.nodeType === Node.ELEMENT_NODE) {
-        const img = (element as Element).querySelector?.('img');
-        if (img && img.complete && (img as HTMLImageElement).naturalWidth > 0) {
-          return this.createImageInfo(img as HTMLImageElement);
+        const el = element as Element;
+        if (STOP_TAGS.has(el.tagName)) break;
+
+        // Only match if this element is a known image wrapper
+        const isImageWrapper =
+          el.tagName === 'FIGURE' ||
+          el.tagName === 'PICTURE' ||
+          el.classList.contains('image-wrapper') ||
+          el.classList.contains('image-container');
+
+        if (isImageWrapper) {
+          const img = el.querySelector('img');
+          if (img && (img as HTMLImageElement).complete && (img as HTMLImageElement).naturalWidth > 0) {
+            return this.createImageInfo(img as HTMLImageElement);
+          }
         }
       }
       element = element.parentNode;
-    }
-
-    // Method 2: Check background image or figure
-    const range = selection.getRangeAt(0);
-    const commonAncestor = range.commonAncestorContainer;
-
-    if (commonAncestor.nodeType === Node.TEXT_NODE) {
-      const parent = commonAncestor.parentElement;
-      const img = parent?.closest('img[alt], figure, .image-wrapper, .image-container')?.querySelector('img');
-      if (img) {
-        return this.createImageInfo(img as HTMLImageElement);
-      }
     }
 
     return Promise.resolve(null);
@@ -244,7 +271,7 @@ class ImageTextDetector {
       button.style.cssText = `
         position: fixed;
         left: ${rect.right + 12}px;
-        top: ${rect.top + window.scrollY}px;
+        top: ${rect.top}px;
         z-index: 9999999;
         background: linear-gradient(135deg, #6366f1, #8b5cf6);
         color: white;
@@ -279,6 +306,10 @@ class ImageTextDetector {
       this.popup.remove();
       this.popup = null;
     }
+    // Clear flag if no panel is showing either
+    if (!this.panel) {
+      window.__selectAI_ocrActive = false;
+    }
   }
 
   // Show translation/explanation panel
@@ -297,8 +328,8 @@ class ImageTextDetector {
       </div>
       <div class="ocr-panel-content">
         ${data.status === 'loading'
-          ? '<div class="ocr-loading">识别中...</div>'
-          : `
+        ? '<div class="ocr-loading">识别中...</div>'
+        : `
             <div class="ocr-original">
               <div class="ocr-label">原文</div>
               <div class="ocr-text">${originalText}</div>
@@ -315,7 +346,7 @@ class ImageTextDetector {
               </button>
             </div>
           `
-        }
+      }
       </div>
     `;
 
@@ -366,6 +397,7 @@ class ImageTextDetector {
       this.panel.remove();
       this.panel = null;
     }
+    window.__selectAI_ocrActive = false;
   }
 
   // Handle translate action
