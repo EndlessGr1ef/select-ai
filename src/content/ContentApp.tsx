@@ -3,6 +3,8 @@ import ReactMarkdown from 'react-markdown';
 import { ContextExtractor } from '../utils/ContextExtractor';
 import { containsKanji, getUILanguage, isLikelyJapanese } from '../utils/language';
 import { translations } from '../utils/i18n';
+import { ScreenshotSelector } from './components/ScreenshotSelector';
+import { ocrService } from '../services/ocrService';
 
 // Augment Window for OCR coordination flag (set by ImageTextDetector)
 declare global {
@@ -33,6 +35,9 @@ const ContentApp: FC = () => {
   const [isTextExpanded, setIsTextExpanded] = useState(false);
   const [contextMaxTokens, setContextMaxTokens] = useState(5000);
   const [sourceLang, setSourceLang] = useState<string | null>(null);
+  
+  // Screenshot mode state
+  const [screenshotMode, setScreenshotMode] = useState(false);
 
   const clampValue = (value: number, min: number, max: number) => Math.min(Math.max(value, min), max);
 
@@ -856,6 +861,94 @@ const ContentApp: FC = () => {
     };
   }, []);
 
+  // Listen for screenshot message via custom event (from index.tsx)
+  useEffect(() => {
+    const handleStartScreenshot = () => {
+      setScreenshotMode(true);
+    };
+
+    window.addEventListener('select-ai-start-screenshot', handleStartScreenshot);
+    
+    return () => {
+      window.removeEventListener('select-ai-start-screenshot', handleStartScreenshot);
+    };
+  }, []); // Empty deps - only add listener once on mount
+
+  // Handle screenshot complete
+  const handleScreenshotComplete = async (blob: Blob) => {
+    setScreenshotMode(false);
+
+    try {
+      // Show panel in loading state first
+      const { width, height } = getViewportBounds();
+      const centerPos = { 
+        x: width / 2 + window.scrollX, 
+        y: height / 3 + window.scrollY 
+      };
+      setPosition(centerPos);
+      positionRef.current = centerPos;
+      selectionRectRef.current = { height: 0 };
+      setShowDot(false);
+      setShowPanel(true);
+      setLoading(true);
+      setResult('');
+      setSelection('识别中...');
+
+      console.log('[ContentApp] Starting OCR recognition...');
+
+      // OCR recognition
+      const settings = await ocrService.loadSettings();
+      console.log('[ContentApp] OCR settings:', settings);
+
+      if (!settings.ocrLanguages || settings.ocrLanguages.length === 0) {
+        setLoading(false);
+        setResult('**错误:** 请先在设置页面选择并下载语言包');
+        setSelection('未配置语言包');
+        return;
+      }
+
+      const ocrResult = await ocrService.recognize(blob, settings.ocrLanguages);
+      console.log('[ContentApp] OCR result:', ocrResult);
+
+      if (!ocrResult.text || ocrResult.text.trim().length === 0) {
+        setLoading(false);
+        setResult('**提示:** 未识别到文字，请重新截图');
+        setSelection('未识别到文字');
+        return;
+      }
+
+      // Trigger AI translation/explanation
+      handleTriggerQueryRef.current({
+        text: ocrResult.text,
+        context: '',
+        imageText: ocrResult.text,
+      });
+    } catch (error) {
+      console.error('[ContentApp] Screenshot OCR failed:', error);
+      setLoading(false);
+      
+      // More detailed error message
+      let errorMessage = '截图识别失败';
+      if (error instanceof Error) {
+        if (error.message.includes('Failed to fetch')) {
+          errorMessage = '语言包加载失败，请检查网络连接或在设置页面重新下载语言包';
+        } else if (error.message.includes('language')) {
+          errorMessage = '语言包未找到，请在设置页面下载所需语言包';
+        } else {
+          errorMessage = error.message;
+        }
+      }
+      
+      setResult(`**错误:** ${errorMessage}`);
+      setSelection('识别失败');
+    }
+  };
+
+  // Handle screenshot cancel
+  const handleScreenshotCancel = () => {
+    setScreenshotMode(false);
+  };
+
   useEffect(() => {
     return () => {
       disconnectStreamPort();
@@ -1539,6 +1632,14 @@ const ContentApp: FC = () => {
             )}
           </div>
         </div>
+      )}
+      
+      {/* Screenshot selector */}
+      {screenshotMode && (
+        <ScreenshotSelector
+          onComplete={handleScreenshotComplete}
+          onCancel={handleScreenshotCancel}
+        />
       )}
     </>
   );

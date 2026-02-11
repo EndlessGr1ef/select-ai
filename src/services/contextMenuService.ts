@@ -3,23 +3,33 @@
 
 class ContextMenuService {
   private menuId = 'select-ai-ocr-image';
+  private screenshotMenuId = 'select-ai-screenshot-ocr';
 
   // Create context menus
   async createMenus(): Promise<void> {
     // Clean up existing menus first
     this.destroy();
 
-    // Single menu item for image OCR + AI explanation
+    // Menu item for image OCR + AI explanation
     chrome.contextMenus.create({
       id: this.menuId,
       title: '📷 AI 图片解释',
       contexts: ['image'],
     });
 
+    // Menu item for screenshot OCR + AI explanation
+    chrome.contextMenus.create({
+      id: this.screenshotMenuId,
+      title: '📸 截图识别',
+      contexts: ['all'],
+    });
+
     // Add click listener
     chrome.contextMenus.onClicked.addListener((info, tab) => {
       if (info.menuItemId === this.menuId) {
         this.delegateToContentScript(tab?.id, info.srcUrl);
+      } else if (info.menuItemId === this.screenshotMenuId) {
+        this.triggerScreenshot(tab?.id);
       }
     });
 
@@ -39,6 +49,23 @@ class ContextMenuService {
     }, (response) => {
       if (chrome.runtime.lastError) {
         console.error('[ContextMenu] Failed to send to content script:', chrome.runtime.lastError.message);
+        this.showNotification('操作失败，请刷新页面后重试');
+      } else if (response?.error) {
+        console.error('[ContextMenu] Content script error:', response.error);
+        this.showNotification(response.error);
+      }
+    });
+  }
+
+  // Trigger screenshot selection mode
+  private triggerScreenshot(tabId: number | undefined): void {
+    if (!tabId) return;
+
+    chrome.tabs.sendMessage(tabId, {
+      action: 'start-screenshot',
+    }, (response) => {
+      if (chrome.runtime.lastError) {
+        console.error('[ContextMenu] Failed to send screenshot message:', chrome.runtime.lastError.message);
         this.showNotification('操作失败，请刷新页面后重试');
       } else if (response?.error) {
         console.error('[ContextMenu] Content script error:', response.error);
