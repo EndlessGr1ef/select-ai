@@ -1232,12 +1232,32 @@ chrome.storage.onChanged.addListener(async (changes) => {
 });
 
 // Handle messages for context menu control
-chrome.runtime.onMessage.addListener((message, _sender, sendResponse) => {
+chrome.runtime.onMessage.addListener((message, sender, sendResponse) => {
   if (message.action === 'create-context-menu') {
     contextMenuService.createMenus().then(() => sendResponse({ success: true })).catch(err => sendResponse({ error: err.message }));
     return true;
   } else if (message.action === 'clear-context-menu') {
     contextMenuService.destroy();
     sendResponse({ success: true });
+  } else if (message.action === 'capture-screenshot') {
+    // Capture visible tab for screenshot
+    if (!sender.tab?.windowId) {
+      sendResponse({ error: 'No active tab' });
+      return;
+    }
+
+    chrome.tabs.captureVisibleTab(
+      sender.tab.windowId,
+      { format: 'png' },
+      (dataUrl) => {
+        if (chrome.runtime.lastError) {
+          console.error('[Background] Screenshot capture failed:', chrome.runtime.lastError.message);
+          sendResponse({ error: chrome.runtime.lastError.message });
+        } else {
+          sendResponse({ dataUrl });
+        }
+      }
+    );
+    return true; // Keep channel open for async response
   }
 });

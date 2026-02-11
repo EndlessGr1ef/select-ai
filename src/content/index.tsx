@@ -55,6 +55,11 @@ chrome.runtime.onMessage.addListener((message, _sender, sendResponse) => {
       .then(() => sendResponse({ success: true }))
       .catch((err) => sendResponse({ error: String(err) }));
     return true; // Keep message channel open for async response
+  } else if (message.action === 'start-screenshot') {
+    // Trigger screenshot mode via custom event
+    window.dispatchEvent(new CustomEvent('select-ai-start-screenshot'));
+    sendResponse({ success: true });
+    return true;
   }
 });
 
