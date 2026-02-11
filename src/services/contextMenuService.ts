@@ -4,6 +4,26 @@
 class ContextMenuService {
   private menuId = 'select-ai-ocr-image';
   private screenshotMenuId = 'select-ai-screenshot-ocr';
+  private listenerRegistered = false;
+
+  constructor() {
+    // Register click listener once (addListener is cumulative; calling it in
+    // createMenus would stack duplicate listeners every time menus are recreated)
+    this.registerClickListener();
+  }
+
+  private registerClickListener(): void {
+    if (this.listenerRegistered) return;
+    this.listenerRegistered = true;
+
+    chrome.contextMenus.onClicked.addListener((info, tab) => {
+      if (info.menuItemId === this.menuId) {
+        this.delegateToContentScript(tab?.id, info.srcUrl);
+      } else if (info.menuItemId === this.screenshotMenuId) {
+        this.triggerScreenshot(tab?.id);
+      }
+    });
+  }
 
   // Create context menus
   async createMenus(): Promise<void> {
@@ -13,24 +33,15 @@ class ContextMenuService {
     // Menu item for image OCR + AI explanation
     chrome.contextMenus.create({
       id: this.menuId,
-      title: '📷 AI 图片解释',
+      title: 'AI 图片解释',
       contexts: ['image'],
     });
 
     // Menu item for screenshot OCR + AI explanation
     chrome.contextMenus.create({
       id: this.screenshotMenuId,
-      title: '📸 截图识别',
+      title: '截图识别',
       contexts: ['all'],
-    });
-
-    // Add click listener
-    chrome.contextMenus.onClicked.addListener((info, tab) => {
-      if (info.menuItemId === this.menuId) {
-        this.delegateToContentScript(tab?.id, info.srcUrl);
-      } else if (info.menuItemId === this.screenshotMenuId) {
-        this.triggerScreenshot(tab?.id);
-      }
     });
 
     console.log('[ContextMenu] Menus created');
