@@ -31,7 +31,11 @@ function normalizeOpenAIEndpoint(baseUrl: string): string {
   return `${trimmed}/v1/chat/completions`;
 }
 
-import { type DetailLevel, buildExplanationPrompt, getMaxTokensForDetailLevel } from '../utils/explanationPrompt';
+import {
+  type DetailLevel, type ImageSource,
+  buildExplanationPrompt, buildImageOCRPrompt, buildScreenshotOCRPrompt,
+  getMaxTokensForDetailLevel, getMaxTokensForImageDetailLevel,
+} from '../utils/explanationPrompt';
 
 // Optimization 1: Config cache - avoid reading storage on every request
 let cachedProviderConfig: {
@@ -125,6 +129,7 @@ type QueryPayload = {
   targetLang?: string;
   uiLang?: 'zh' | 'en';
   imageText?: string;
+  imageSource?: ImageSource;
 };
 
 type KanaPayload = {
@@ -175,9 +180,21 @@ async function buildRequestConfig(payload: QueryPayload): Promise<RequestConfig>
 
   const isChineseTarget = targetLang.startsWith('中文') || targetLang.toLowerCase().startsWith('zh');
 
-  // Build system prompt based on detail level
-  const systemPrompt = buildExplanationPrompt(isChineseTarget, targetLang, detailLevel);
-  const maxTokens = getMaxTokensForDetailLevel(detailLevel);
+  // Build system prompt based on detail level and image source
+  let systemPrompt: string;
+  let maxTokens: number;
+
+  if (payload.imageText && payload.imageSource === 'screenshot-ocr') {
+    systemPrompt = buildScreenshotOCRPrompt(isChineseTarget, targetLang, detailLevel);
+    maxTokens = getMaxTokensForImageDetailLevel(detailLevel);
+  } else if (payload.imageText) {
+    // Default to image-ocr (covers 'image-ocr' and legacy payloads without imageSource)
+    systemPrompt = buildImageOCRPrompt(isChineseTarget, targetLang, detailLevel);
+    maxTokens = getMaxTokensForImageDetailLevel(detailLevel);
+  } else {
+    systemPrompt = buildExplanationPrompt(isChineseTarget, targetLang, detailLevel);
+    maxTokens = getMaxTokensForDetailLevel(detailLevel);
+  }
 
   const imageTag = payload.imageText
     ? `\n<image_content>${payload.imageText}</image_content>`
