@@ -1,6 +1,6 @@
 // Screenshot Selector Component - Allows user to select a rectangular area on screen
 
-import { useState, useEffect, type FC, type MouseEvent as ReactMouseEvent } from 'react';
+import { useState, useEffect, useRef, type FC, type MouseEvent as ReactMouseEvent } from 'react';
 import { useScreenshot } from './useScreenshot';
 import { type ScreenshotSelectorProps, type Rect } from './types';
 
@@ -9,6 +9,7 @@ const ScreenshotSelector: FC<ScreenshotSelectorProps> = ({ onComplete, onCancel 
   const [startPos, setStartPos] = useState<{ x: number; y: number } | null>(null);
   const [currentPos, setCurrentPos] = useState<{ x: number; y: number } | null>(null);
   const [processing, setProcessing] = useState(false);
+  const overlayRef = useRef<HTMLDivElement>(null);
 
   const { captureScreenshot } = useScreenshot();
 
@@ -60,10 +61,22 @@ const ScreenshotSelector: FC<ScreenshotSelectorProps> = ({ onComplete, onCancel 
     setProcessing(true);
 
     try {
+      // Hide overlay before capturing to prevent UI elements (size label, mask)
+      // from appearing in the screenshot and being picked up by OCR
+      if (overlayRef.current) {
+        overlayRef.current.style.display = 'none';
+      }
+      // Wait one frame for the browser to repaint without the overlay
+      await new Promise(resolve => requestAnimationFrame(resolve));
+
       const blob = await captureScreenshot(rect);
       onComplete(blob);
     } catch (error) {
       console.error('[ScreenshotSelector] Capture failed:', error);
+      // Restore overlay visibility on error
+      if (overlayRef.current) {
+        overlayRef.current.style.display = '';
+      }
       // Reset state and call cancel to show error in ContentApp
       setProcessing(false);
       setSelecting(false);
@@ -100,6 +113,7 @@ const ScreenshotSelector: FC<ScreenshotSelectorProps> = ({ onComplete, onCancel 
 
   return (
     <div
+      ref={overlayRef}
       style={{
         position: 'fixed',
         inset: 0,
