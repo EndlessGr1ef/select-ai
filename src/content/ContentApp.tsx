@@ -6,13 +6,6 @@ import { translations } from '../utils/i18n';
 import { ScreenshotSelector } from './components/ScreenshotSelector';
 import { ocrService } from '../services/ocrService';
 
-// Augment Window for OCR coordination flag (set by ImageTextDetector)
-declare global {
-  interface Window {
-    __selectAI_ocrActive?: boolean;
-  }
-}
-
 // Get extension icon URL for content script context
 const appIconUrl = chrome.runtime.getURL('app-icon.png');
 
@@ -454,9 +447,6 @@ const ContentApp: FC = () => {
         return;
       }
 
-      // If OCR ImageTextDetector is handling this selection, suppress the dot
-      if (window.__selectAI_ocrActive) return;
-
       setSelection(text);
       selectionRectRef.current = {
         height: rect.height || 0,
@@ -535,7 +525,7 @@ const ContentApp: FC = () => {
   };
 
   // Trigger AI query; optional overrides for OCR/context-menu text
-  const handleTriggerQuery = async (overrides?: { text: string; context: string; imageText?: string }) => {
+  const handleTriggerQuery = async (overrides?: { text: string; context: string; imageText?: string; imageSource?: 'image-ocr' | 'screenshot-ocr' }) => {
     // Clear hover timer when triggered
     if (hoverTimerRef.current) {
       window.clearTimeout(hoverTimerRef.current);
@@ -589,6 +579,7 @@ const ContentApp: FC = () => {
       const payload = {
         selection: queryText, context, pageUrl, pageTitle, targetLang, uiLang: lang,
         ...(overrides?.imageText ? { imageText: overrides.imageText } : {}),
+        ...(overrides?.imageSource ? { imageSource: overrides.imageSource } : {}),
       };
 
       disconnectStreamPort();
@@ -847,6 +838,7 @@ const ContentApp: FC = () => {
         text: detail.imageText,
         context: '',
         imageText: detail.imageText,
+        imageSource: 'image-ocr',
       });
     };
 
@@ -922,6 +914,7 @@ const ContentApp: FC = () => {
         text: ocrResult.text,
         context: '',
         imageText: ocrResult.text,
+        imageSource: 'screenshot-ocr',
       });
     } catch (error) {
       console.error('[ContentApp] Screenshot OCR failed:', error);

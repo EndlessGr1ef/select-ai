@@ -3,7 +3,6 @@ import { createRoot } from 'react-dom/client';
 import ContentApp from './ContentApp';
 import InlineTranslator from './InlineTranslator';
 import { SiteBlacklist } from '../utils/SiteBlacklist';
-import { imageTextDetector } from './ImageTextDetector';
 import { ocrService } from '../services/ocrService';
 import './content.css';
 
@@ -14,12 +13,6 @@ let rootElement = document.getElementById(rootId);
 async function initApp() {
   const blacklist = new SiteBlacklist();
   await blacklist.load();
-
-  // Load OCR settings and enable if needed
-  const ocrSettings = await ocrService.loadSettings();
-  if (ocrSettings.ocrEnabled) {
-    imageTextDetector.setEnabled(true);
-  }
 
   // Render apps: selection explain is not blocked by blacklist
   createRoot(rootElement!).render(
@@ -36,16 +29,6 @@ if (!rootElement) {
   document.body.appendChild(rootElement);
   initApp();
 }
-
-// Listen for messages from OCR detector (window.postMessage path)
-window.addEventListener('message', (event) => {
-  if (event.data.type === 'select-ai-translate') {
-    // Dispatch custom event for translation
-    window.dispatchEvent(new CustomEvent('select-ai-translate-text', { detail: event.data }));
-  } else if (event.data.type === 'select-ai-explain') {
-    window.dispatchEvent(new CustomEvent('select-ai-explain-text', { detail: event.data }));
-  }
-});
 
 // Listen for messages from background service worker (context menu actions)
 chrome.runtime.onMessage.addListener((message, _sender, sendResponse) => {
