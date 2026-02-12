@@ -185,11 +185,11 @@ async function buildRequestConfig(payload: QueryPayload): Promise<RequestConfig>
   let maxTokens: number;
 
   if (payload.imageText && payload.imageSource === 'screenshot-ocr') {
-    systemPrompt = buildScreenshotOCRPrompt(isChineseTarget, targetLang, detailLevel);
+    systemPrompt = buildScreenshotOCRPrompt(targetLang, detailLevel);
     maxTokens = getMaxTokensForImageDetailLevel(detailLevel);
   } else if (payload.imageText) {
     // Default to image-ocr (covers 'image-ocr' and legacy payloads without imageSource)
-    systemPrompt = buildImageOCRPrompt(isChineseTarget, targetLang, detailLevel);
+    systemPrompt = buildImageOCRPrompt(targetLang, detailLevel);
     maxTokens = getMaxTokensForImageDetailLevel(detailLevel);
   } else {
     systemPrompt = buildExplanationPrompt(isChineseTarget, targetLang, detailLevel);

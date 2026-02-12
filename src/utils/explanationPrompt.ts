@@ -11,30 +11,30 @@ export function buildExplanationPrompt(isChineseTarget: boolean, targetLang: str
     const detailRules: Record<DetailLevel, { rule3: string; rule4: string }> = {
       concise: {
         rule3: '3. 生成解释时保持回答内容精炼简短，只输出核心含义，不要冗长啰嗦;',
-        rule4: `4. 必须严格按以下格式输出回答内容;
-   基础含义:
+        rule4: `4. 必须严格按以下格式输出回答内容 (小标题必须加粗，冒号后换行输出内容):
+   **基础含义**:
    xxx
-   上下文中的含义:
+   **上下文中的含义**:
    xxx`
       },
       standard: {
         rule3: '3. 生成解释时提供适度详细的内容，可根据选中内容的性质补充必要的背景信息;',
-        rule4: `4. 必须按以下基本格式输出，可根据需要添加"补充说明"部分;
-   基础含义:
+        rule4: `4. 必须按以下基本格式输出，可根据需要添加"补充说明"部分 (小标题必须加粗，冒号后换行输出内容):
+   **基础含义**:
    xxx
-   上下文中的含义:
+   **上下文中的含义**:
    xxx
-   补充说明（可选）:
+   **补充说明（可选）**:
    xxx`
       },
       detailed: {
         rule3: '3. 生成解释时尽可能详尽，提供丰富的背景知识、相关概念或延伸信息;',
-        rule4: `4. 按以下基本格式输出，并添加详细的补充说明;
-   基础含义:
+        rule4: `4. 按以下基本格式输出，并添加详细的补充说明 (小标题必须加粗，冒号后换行输出内容):
+   **基础含义**:
    xxx
-   上下文中的含义:
+   **上下文中的含义**:
    xxx
-   延伸信息:
+   **延伸信息**:
    xxx`
       }
     };
@@ -55,30 +55,30 @@ ${rules.rule4}
     const detailRules: Record<DetailLevel, { rule3: string; rule4: string }> = {
       concise: {
         rule3: '3. Keep your response concise and brief, output only core meanings, avoid verbosity;',
-        rule4: `4. You MUST output in the following format only, nothing else:
-   Base meaning: 
+        rule4: `4. You MUST output in the following format only, nothing else (section headers must be bold, content on a new line after the colon):
+   **Base meaning**: 
    xxx;
-   Contextual meaning: 
+   **Contextual meaning**: 
    xxx;`
       },
       standard: {
         rule3: '3. Provide moderately detailed content, supplement with relevant background based on the nature of selected text;',
-        rule4: `4. Output in the following base format, you may add an "Additional notes" section if helpful:
-   Base meaning: 
+        rule4: `4. Output in the following base format, you may add an "Additional notes" section if helpful (section headers must be bold, content on a new line after the colon):
+   **Base meaning**: 
    xxx;
-   Contextual meaning: 
+   **Contextual meaning**: 
    xxx;
-   Additional notes (optional): 
+   **Additional notes (optional)**: 
    xxx;`
       },
       detailed: {
         rule3: '3. Be as detailed as possible, provide rich background knowledge, related concepts, or extended information;',
-        rule4: `4. Output in the following format with detailed supplementary information:
-   Base meaning: 
+        rule4: `4. Output in the following format with detailed supplementary information (section headers must be bold, content on a new line after the colon):
+   **Base meaning**: 
    xxx;
-   Contextual meaning: 
+   **Contextual meaning**: 
    xxx;
-   Extended information: 
+   **Extended information**: 
    xxx;`
       }
     };
@@ -118,193 +118,98 @@ export function getMaxTokensForImageDetailLevel(detailLevel: DetailLevel): numbe
 }
 
 // Build system prompt for webpage image OCR
-export function buildImageOCRPrompt(isChineseTarget: boolean, targetLang: string, detailLevel: DetailLevel): string {
-  if (isChineseTarget) {
-    const detailRules: Record<DetailLevel, { rule3: string; rule4: string }> = {
-      concise: {
-        rule3: '3. 保持回答精炼简短，只输出核心识别结果和简要翻译;',
-        rule4: `4. 必须严格按以下格式输出:
-   识别文字:
-   xxx
-   翻译/解释:
-   xxx`
-      },
-      standard: {
-        rule3: '3. 提供适度详细的内容，包含识别结果、翻译和必要的背景信息;',
-        rule4: `4. 按以下格式输出，可根据需要添加"补充说明"部分:
-   识别文字:
-   xxx
-   翻译/解释:
-   xxx
-   补充说明（可选）:
-   xxx`
-      },
-      detailed: {
-        rule3: '3. 尽可能详尽，提供完整的识别结果、翻译、背景知识和延伸信息;',
-        rule4: `4. 按以下格式输出，并添加详细的补充说明:
-   识别文字:
-   xxx
-   翻译/解释:
-   xxx
-   延伸信息:
-   xxx`
-      }
-    };
-
-    const rules = detailRules[detailLevel];
-    return `你是一个浏览器图片文字识别助手。用户通过右键菜单对网页中的图片进行了OCR文字识别，请对识别出的文字进行翻译和解释。
-
-【必须遵守的规则】
-1. 首先输出原文语言标签: <source_lang>xx</source_lang>,xx为语言代码(en/ja/zh/ko/fr/de/es等);
-2. <image_content>标签中的内容是OCR识别出的原始文字，可能包含识别错误;
-3. 请自动纠正常见的OCR识别错误（如: 0和O混淆、1和l和I混淆、rn和m混淆、连字符断行等）;
-4. 保留原文的换行、缩进和列表等格式结构;
-${rules.rule3}
-${rules.rule4}
-5. 请以陈述句回答;
-6. 用中文回答,按markdown格式美化输出;
-7. 禁止使用代码块、内联代码或HTML标签(例如: \`\`\`、\`code\`、<tag>,但source_lang标签除外)`;
-  } else {
-    const detailRules: Record<DetailLevel, { rule3: string; rule4: string }> = {
-      concise: {
-        rule3: '3. Keep your response concise, output only core recognized text and brief translation;',
-        rule4: `4. You MUST output in the following format only:
-   Recognized text:
+export function buildImageOCRPrompt(targetLang: string, detailLevel: DetailLevel): string {
+  const detailRules: Record<DetailLevel, { rule3: string; rule4: string }> = {
+    concise: {
+      rule3: '3. Keep your response concise, output only core recognized text and brief translation;',
+      rule4: `4. You MUST output in the following format only (section headers must be bold, content on a new line after the colon):
+   **Translation:**
    xxx;
-   Translation/Explanation:
+   **Explanation:**
    xxx;`
-      },
-      standard: {
-        rule3: '3. Provide moderately detailed content including recognized text, translation, and relevant background;',
-        rule4: `4. Output in the following format, you may add an "Additional notes" section if helpful:
-   Recognized text:
+    },
+    standard: {
+      rule3: '3. Provide moderately detailed content including recognized text, translation, and relevant background;',
+      rule4: `4. Output in the following format, you may add an "Additional notes" section if helpful (section headers must be bold, content on a new line after the colon):
+   **Translation:**
    xxx;
-   Translation/Explanation:
+   **Explanation:**
    xxx;
-   Additional notes (optional):
+   **Additional notes:**
    xxx;`
-      },
-      detailed: {
-        rule3: '3. Be as detailed as possible with complete recognized text, translation, background knowledge and extended information;',
-        rule4: `4. Output in the following format with detailed supplementary information:
-   Recognized text:
+    },
+    detailed: {
+      rule3: '3. Be as detailed as possible with complete recognized text, translation, background knowledge and extended information;',
+      rule4: `4. Output in the following format with detailed supplementary information (section headers must be bold, content on a new line after the colon):
+   **Translation:**
    xxx;
-   Translation/Explanation:
+   **Explanation:**
    xxx;
-   Extended information:
+   **Extended information:**
    xxx;`
-      }
-    };
+    }
+  };
 
-    const rules = detailRules[detailLevel];
-    return `You are a browser image text recognition assistant. The user has performed OCR on an image in a webpage via the right-click menu. Please translate and explain the recognized text.
+  const rules = detailRules[detailLevel];
+  return `You are a browser image text recognition assistant. The user has performed OCR on an image in a webpage via the right-click menu. Please translate and explain the recognized text.
 
 【Must follow rules】
 1. First output source language tag: <source_lang>xx</source_lang>, where xx is the language code (en/ja/zh/ko/fr/de/es, etc.);
 2. The content in the <image_content> tag is the raw OCR-recognized text, which may contain recognition errors;
-3. Automatically correct common OCR errors (e.g., 0/O confusion, 1/l/I confusion, rn/m confusion, hyphenated line breaks, etc.);
+3. Automatically correct common OCR errors (e.g., 0/O confusion, 1/l/I confusion, rn/m confusion, hyphenated line breaks, excessive spaces between CJK characters, etc.);
 4. Preserve the original line breaks, indentation, and list structures;
 ${rules.rule3}
 ${rules.rule4}
 5. Answer in a declarative sentence;
-6. Respond in ${targetLang}, beautify the output in markdown format;
+6. Respond in ${targetLang}, translate ALL text elements including section titles, paragraph headings, labels, captions and any other structural text, beautify the output in markdown format;
 7. Do not use code blocks, inline code, or HTML tags (e.g., \`\`\` or \`code\` or <tag>, except source_lang tag)`;
-  }
 }
 
 // Build system prompt for screenshot OCR
-export function buildScreenshotOCRPrompt(isChineseTarget: boolean, targetLang: string, detailLevel: DetailLevel): string {
-  if (isChineseTarget) {
-    const detailRules: Record<DetailLevel, { rule3: string; rule4: string }> = {
-      concise: {
-        rule3: '3. 保持回答精炼简短，只输出核心识别结果和简要翻译;',
-        rule4: `4. 必须严格按以下格式输出:
-   识别文字:
-   xxx
-   翻译/解释:
-   xxx`
-      },
-      standard: {
-        rule3: '3. 提供适度详细的内容，包含识别结果、翻译和必要的背景信息;',
-        rule4: `4. 按以下格式输出，可根据需要添加"补充说明"部分:
-   识别文字:
-   xxx
-   翻译/解释:
-   xxx
-   补充说明（可选）:
-   xxx`
-      },
-      detailed: {
-        rule3: '3. 尽可能详尽，提供完整的识别结果、翻译、背景知识和延伸信息;',
-        rule4: `4. 按以下格式输出，并添加详细的补充说明:
-   识别文字:
-   xxx
-   翻译/解释:
-   xxx
-   延伸信息:
-   xxx`
-      }
-    };
-
-    const rules = detailRules[detailLevel];
-    return `你是一个截图文字识别助手。用户对屏幕进行了截图并通过OCR识别出了文字，请对识别出的文字进行翻译和解释。
-
-【必须遵守的规则】
-1. 首先输出原文语言标签: <source_lang>xx</source_lang>,xx为语言代码(en/ja/zh/ko/fr/de/es等);
-2. <image_content>标签中的内容是从截图中OCR识别出的原始文字，可能包含识别错误;
-3. 请自动纠正常见的OCR识别错误（如: 0和O混淆、1和l和I混淆、rn和m混淆、连字符断行等）;
-4. 保留原文的空间布局、表格结构和多段落层次;
-5. 截图内容可能包含UI元素、混合语言、代码片段或对话框，如果内容看起来像UI/菜单/对话框，请描述其功能;
-${rules.rule3}
-${rules.rule4}
-6. 请以陈述句回答;
-7. 用中文回答,按markdown格式美化输出;
-8. 禁止使用代码块、内联代码或HTML标签(例如: \`\`\`、\`code\`、<tag>,但source_lang标签除外)`;
-  } else {
-    const detailRules: Record<DetailLevel, { rule3: string; rule4: string }> = {
-      concise: {
-        rule3: '3. Keep your response concise, output only core recognized text and brief translation;',
-        rule4: `4. You MUST output in the following format only:
-   Recognized text:
+export function buildScreenshotOCRPrompt(targetLang: string, detailLevel: DetailLevel): string {
+  const detailRules: Record<DetailLevel, { rule3: string; rule4: string }> = {
+    concise: {
+      rule3: '3. Keep your response concise, output only core recognized text and brief translation;',
+      rule4: `4. You MUST output in the following format only (section headers must be bold, content on a new line after the colon):
+   **Translation:**
    xxx;
-   Translation/Explanation:
+   **Explanation:**
    xxx;`
-      },
-      standard: {
-        rule3: '3. Provide moderately detailed content including recognized text, translation, and relevant background;',
-        rule4: `4. Output in the following format, you may add an "Additional notes" section if helpful:
-   Recognized text:
+    },
+    standard: {
+      rule3: '3. Provide moderately detailed content including recognized text, translation, and relevant background;',
+      rule4: `4. Output in the following format, you may add an "Additional notes" section if helpful (section headers must be bold, content on a new line after the colon):
+   **Translation:**
    xxx;
-   Translation/Explanation:
+   **Explanation:**
    xxx;
-   Additional notes (optional):
+   **Additional notes:**
    xxx;`
-      },
-      detailed: {
-        rule3: '3. Be as detailed as possible with complete recognized text, translation, background knowledge and extended information;',
-        rule4: `4. Output in the following format with detailed supplementary information:
-   Recognized text:
+    },
+    detailed: {
+      rule3: '3. Be as detailed as possible with complete recognized text, translation, background knowledge and extended information;',
+      rule4: `4. Output in the following format with detailed supplementary information (section headers must be bold, content on a new line after the colon):
+   **Translation:**
    xxx;
-   Translation/Explanation:
+   **Explanation:**
    xxx;
-   Extended information:
+   **Extended information:**
    xxx;`
-      }
-    };
+    }
+  };
 
-    const rules = detailRules[detailLevel];
-    return `You are a screenshot text recognition assistant. The user has taken a screenshot and performed OCR to recognize text. Please translate and explain the recognized text.
+  const rules = detailRules[detailLevel];
+  return `You are a screenshot text recognition assistant. The user has taken a screenshot and performed OCR to recognize text. Please translate and explain the recognized text.
 
 【Must follow rules】
 1. First output source language tag: <source_lang>xx</source_lang>, where xx is the language code (en/ja/zh/ko/fr/de/es, etc.);
 2. The content in the <image_content> tag is the raw OCR-recognized text from a screenshot, which may contain recognition errors;
-3. Automatically correct common OCR errors (e.g., 0/O confusion, 1/l/I confusion, rn/m confusion, hyphenated line breaks, etc.);
+3. Automatically correct common OCR errors (e.g., 0/O confusion, 1/l/I confusion, rn/m confusion, hyphenated line breaks, excessive spaces between CJK characters, etc.);
 4. Preserve the original spatial layout, table structures, and multi-paragraph hierarchy;
 5. Screenshots may contain UI elements, mixed languages, code snippets, or dialogs — if the content looks like a UI/menu/dialog, describe its function;
 ${rules.rule3}
 ${rules.rule4}
 6. Answer in a declarative sentence;
-7. Respond in ${targetLang}, beautify the output in markdown format;
+7. Respond in ${targetLang}, translate ALL text elements including section titles, paragraph headings, labels, captions and any other structural text, beautify the output in markdown format;
 8. Do not use code blocks, inline code, or HTML tags (e.g., \`\`\` or \`code\` or <tag>, except source_lang tag)`;
-  }
 }

@@ -214,6 +214,32 @@ class OCRService {
     }
   }
 
+  // Remove spurious spaces between CJK characters inserted by Tesseract.
+  // Keeps spaces between Latin/number characters intact.
+  private cleanOCRText(text: string): string {
+    // CJK Unified Ideographs, CJK Extension A, Hiragana, Katakana,
+    // Katakana Phonetic Extensions, CJK Symbols/Punctuation, Fullwidth forms,
+    // Hangul Syllables, common CJK punctuation
+    const CJK = '[\\u3000-\\u303f\\u3040-\\u309f\\u30a0-\\u30ff\\u3400-\\u4dbf\\u4e00-\\u9fff\\uf900-\\ufaff\\uff00-\\uffef\\uac00-\\ud7af]';
+
+    // Remove spaces between two CJK characters
+    let cleaned = text.replace(
+      new RegExp(`(${CJK})\\s+(${CJK})`, 'g'),
+      '$1$2',
+    );
+    // The regex only matches pairs, so "A B C D" needs multiple passes
+    // (A+B matched, C+D matched, but B C gap remains). Run once more.
+    cleaned = cleaned.replace(
+      new RegExp(`(${CJK})\\s+(${CJK})`, 'g'),
+      '$1$2',
+    );
+
+    // Collapse multiple blank lines into one
+    cleaned = cleaned.replace(/\n{3,}/g, '\n\n');
+
+    return cleaned.trim();
+  }
+
   // Recognize text from image
   async recognize(
     imageSource: File | Blob | string,
@@ -241,7 +267,7 @@ class OCRService {
       })) || [];
 
       return {
-        text: result.data.text.trim(),
+        text: this.cleanOCRText(result.data.text),
         confidence: result.data.confidence,
         words,
       };
