@@ -2,6 +2,12 @@
 
 <div align="center">
 
+**English** | **[中文](README.md)**
+
+</div>
+
+<div align="center">
+
 **AI划词解释工具 | 选中即解释 | 智能上下文感知**
 
 [![MIT License](https://img.shields.io/badge/License-MIT-green.svg)](LICENSE)

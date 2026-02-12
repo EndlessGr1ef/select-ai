@@ -2,6 +2,12 @@
 
 <div align="center">
 
+**[English](README.en.md)** | **中文**
+
+</div>
+
+<div align="center">
+
 **AI-powered Selection Search | Select to Explain | Context-aware**
 
 [![MIT License](https://img.shields.io/badge/License-MIT-green.svg)](LICENSE)
