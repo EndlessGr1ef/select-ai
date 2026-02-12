@@ -64,6 +64,8 @@ Build generates `dist/` and `select-ai.zip`. Load `dist/` in Chrome or unzip `se
 | Feature | Description | Use Case |
 |---------|-------------|----------|
 | 🎯 **Smart Selection** | Floating button appears on text selection, click to query | Get instant explanations |
+| 🖼️ **Image OCR** | Right-click any image to extract text and get AI explanation | Image text recognition & translation |
+| 📷 **Screenshot OCR** | Select any area on screen to capture and recognize text | Quick understanding of screenshot content |
 | 🧠 **Context Awareness** | Auto-extract context (default 5000, adjustable 200-50000) | Technical terms, complex sentences |
 | 📊 **Detail Level** | Choose concise/standard/detailed explanations | Quick scan or deep learning |
 | 🚀 **Streaming Output** | Stream responses in real time as they are generated | Get answers faster |

@@ -56,14 +56,14 @@ export const PROVIDER_CONFIGS: Record<Provider, ProviderConfig> = {
     modelOptions: ['deepseek-chat', 'deepseek-reasoner'],
   },
   glm: {
-    name: { zh: '智谱 AI', en: 'Zhipu AI' },
-    defaultBaseUrl: 'https://open.bigmodel.cn/api/anthropic',
+    name: { zh: '智谱AI', en: 'Z.ai' },
+    defaultBaseUrl: 'https://open.bigmodel.cn/api/paas/v4',
     defaultModel: 'glm-4.7',
     storageKey: 'glm',
-    endpointPath: '',
+    endpointPath: '/chat/completions',
     authHeader: 'Bearer',
     extraHeaders: {},
-    modelOptions: ['glm-4.7'],
+    modelOptions: ['glm-5','glm-4.7','glm-4.5-air'],
   },
 };
 

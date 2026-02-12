@@ -1,5 +1,21 @@
 # Changelog / 更新日志
 
+## [0.4.3] - 2026-02-12
+
+### Added / 新增
+- **Image OCR Recognition** - Right-click on any image to extract text and get AI explanation / **图片OCR识别** - 右键任意图片提取文字并获得AI解释
+- **Screenshot OCR** - Select any area on screen to capture and recognize text / **截图识别** - 选择屏幕任意区域截图并识别文字
+- Multi-language OCR support (Japanese, English, Simplified Chinese) / 多语言OCR支持（日语、英语、简体中文）
+- OCR language pack download with progress indicator / OCR语言包下载带进度指示器
+- OCR settings panel in options page / 设置页面新增OCR设置面板
+
+### Changed / 改进
+- Added `contextMenus` and `notifications` permissions for right-click menu / 添加右键菜单所需的权限
+- Added `web_accessible_resources` for Tesseract.js worker files / 添加Tesseract.js工作文件资源访问配置
+- Improved extension context validation to prevent "Extension context invalidated" errors / 改进扩展上下文验证，防止"Extension context invalidated"错误
+
+---
+
 ## [0.4.0] - 2026-01-30
 
 ### Added / 新增

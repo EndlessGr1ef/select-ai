@@ -149,7 +149,7 @@ type RequestConfig = {
 type StreamFormat = 'openai' | 'anthropic';
 
 function getStreamFormat(provider: Provider): StreamFormat {
-  return provider === 'openai' || provider === 'deepseek'
+  return provider === 'openai' || provider === 'deepseek' || provider === 'glm'
     ? 'openai'
     : 'anthropic';
 }
