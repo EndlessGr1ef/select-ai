@@ -12,6 +12,8 @@
 
 ![Demo](demo.gif)
 
+![Translation Demo](demo_translation.gif)
+
 </div>
 
 ## 🎯 适用人群/场景

@@ -11,6 +11,7 @@
 <div align="center">
 
 ![Demo](demo_en.gif)
+![Translation Demo](demo_translation.gif)
 
 </div>
 
