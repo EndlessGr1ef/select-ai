@@ -14,7 +14,8 @@ import {
   CheckCircle2,
   ShieldCheck,
   Zap,
-  Loader2
+  Loader2,
+  HelpCircle
 } from 'lucide-react';
 import { icons } from '../resource';
 import { type Provider, PROVIDER_CONFIGS, CONTEXT_MAX_TOKENS } from '../config';
@@ -25,7 +26,7 @@ function getDefaultTargetLanguage(): string {
 
 import OCRSettingsComponent from './OCRSettings';
 
-type TabType = 'api' | 'translation' | 'ocr';
+type TabType = 'api' | 'translation' | 'ocr' | 'help';
 
 const OptionsApp: FC = () => {
   const [activeTab, setActiveTab] = useState<TabType>('api');
@@ -485,6 +486,13 @@ const OptionsApp: FC = () => {
               <span>📷</span>
               图片识别
             </button>
+            <button
+              style={getTabStyle(activeTab === 'help')}
+              onClick={() => setActiveTab('help')}
+            >
+              <HelpCircle size={16} strokeWidth={2} />
+              使用帮助
+            </button>
           </div>
         </div>
 
@@ -787,6 +795,102 @@ const OptionsApp: FC = () => {
                 });
               }}
             />
+          )}
+
+          {activeTab === 'help' && (
+            <div style={sectionStyle}>
+              <div style={sectionTitleStyle}>
+                <HelpCircle size={14} strokeWidth={2} />
+                Select AI 使用帮助
+              </div>
+              
+              {/* 核心功能 */}
+              <div style={{ marginBottom: 24 }}>
+                <h3 style={{ fontSize: 15, fontWeight: 600, marginBottom: 12, color: '#1f2937' }}>🎯 核心功能</h3>
+                
+                <div style={{ backgroundColor: '#f9fafb', borderRadius: 8, padding: 16, marginBottom: 12 }}>
+                  <h4 style={{ fontSize: 14, fontWeight: 600, marginBottom: 8, color: '#374151' }}>智能划词解释</h4>
+                  <p style={{ fontSize: 13, color: '#6b7280', lineHeight: 1.6, marginBottom: 8 }}>选中网页任意文字，点击出现的粉紫色悬浮按钮，AI会自动提取上下文并给出精准解释（不是简单翻译）。</p>
+                  <p style={{ fontSize: 12, color: '#9ca3af' }}>适用：遇到生僻术语、阅读专业论文、学习外语</p>
+                </div>
+
+                <div style={{ backgroundColor: '#f9fafb', borderRadius: 8, padding: 16, marginBottom: 12 }}>
+                  <h4 style={{ fontSize: 14, fontWeight: 600, marginBottom: 8, color: '#374151' }}>上下文感知</h4>
+                  <p style={{ fontSize: 13, color: '#6b7280', lineHeight: 1.6, marginBottom: 8 }}>自动提取选中文字周围的上下文内容（默认5000字，最大50000字），帮助AI更准确理解含义。</p>
+                  <p style={{ fontSize: 12, color: '#9ca3af' }}>在"翻译设置"中可调整上下文长度</p>
+                </div>
+
+                <div style={{ backgroundColor: '#f9fafb', borderRadius: 8, padding: 16 }}>
+                  <h4 style={{ fontSize: 14, fontWeight: 600, marginBottom: 8, color: '#374151' }}>双语翻译</h4>
+                  <p style={{ fontSize: 13, color: '#6b7280', lineHeight: 1.6 }}>原文+译文并排显示，支持整页翻译或选中翻译。输出语言可自定义（中文/英文/日文/韩文）。</p>
+                </div>
+              </div>
+
+              {/* OCR功能 */}
+              <div style={{ marginBottom: 24 }}>
+                <h3 style={{ fontSize: 15, fontWeight: 600, marginBottom: 12, color: '#1f2937' }}>🖼️ OCR 识别</h3>
+                
+                <div style={{ backgroundColor: '#f9fafb', borderRadius: 8, padding: 16, marginBottom: 12 }}>
+                  <h4 style={{ fontSize: 14, fontWeight: 600, marginBottom: 8, color: '#374151' }}>图片文字识别</h4>
+                  <p style={{ fontSize: 13, color: '#6b7280', lineHeight: 1.6, marginBottom: 8 }}>在网页图片上右键 → 选择 "Select AI" → "识别文字"或"解释图片"</p>
+                  <p style={{ fontSize: 12, color: '#9ca3af' }}>支持：英语、日语、简体中文（需在设置中下载语言包）</p>
+                </div>
+
+                <div style={{ backgroundColor: '#f9fafb', borderRadius: 8, padding: 16 }}>
+                  <h4 style={{ fontSize: 14, fontWeight: 600, marginBottom: 8, color: '#374151' }}>截图识别</h4>
+                  <p style={{ fontSize: 13, color: '#6b7280', lineHeight: 1.6 }}>点击扩展图标 → "截图识别" → 框选屏幕区域 → 自动识别文字并解释</p>
+                </div>
+              </div>
+
+              {/* 日语功能 */}
+              <div style={{ marginBottom: 24 }}>
+                <h3 style={{ fontSize: 15, fontWeight: 600, marginBottom: 12, color: '#1f2937' }}>🇯🇵 日语学习</h3>
+                
+                <div style={{ backgroundColor: '#f9fafb', borderRadius: 8, padding: 16, marginBottom: 12 }}>
+                  <h4 style={{ fontSize: 14, fontWeight: 600, marginBottom: 8, color: '#374151' }}>假名标注</h4>
+                  <p style={{ fontSize: 13, color: '#6b7280', lineHeight: 1.6, marginBottom: 8 }}>在日语汉字上方显示假名注音（Ruby），如：日本語(にほんご)</p>
+                  <p style={{ fontSize: 12, color: '#9ca3af' }}>在"翻译设置"中可开关</p>
+                </div>
+
+                <div style={{ backgroundColor: '#f9fafb', borderRadius: 8, padding: 16 }}>
+                  <h4 style={{ fontSize: 14, fontWeight: 600, marginBottom: 8, color: '#374151' }}>朗读功能</h4>
+                  <p style={{ fontSize: 13, color: '#6b7280', lineHeight: 1.6 }}>点击面板中的朗读按钮，可朗读原文或译文。支持日语假名+朗读组合。</p>
+                </div>
+              </div>
+
+              {/* 面板操作 */}
+              <div style={{ marginBottom: 24 }}>
+                <h3 style={{ fontSize: 15, fontWeight: 600, marginBottom: 12, color: '#1f2937' }}>🖱️ 面板操作</h3>
+                <ul style={{ fontSize: 13, color: '#6b7280', lineHeight: 1.8, paddingLeft: 20 }}>
+                  <li>拖拽面板顶部移动位置</li>
+                  <li>拖拽面板边缘调整大小</li>
+                  <li>点击面板外区域或按 ESC 关闭</li>
+                </ul>
+              </div>
+
+              {/* 隐私 */}
+              <div style={{ marginBottom: 24 }}>
+                <h3 style={{ fontSize: 15, fontWeight: 600, marginBottom: 12, color: '#1f2937' }}>🔒 隐私安全</h3>
+                <div style={{ backgroundColor: '#ecfdf5', border: '1px solid #a7f3d0', borderRadius: 8, padding: 12 }}>
+                  <p style={{ fontSize: 13, color: '#065f46', lineHeight: 1.6 }}>
+                    ✅ API Key 仅存储在本地浏览器<br/>
+                    ✅ 不上传任何用户数据<br/>
+                    ✅ 不收集浏览记录
+                  </p>
+                </div>
+              </div>
+
+              {/* 快捷入门 */}
+              <div>
+                <h3 style={{ fontSize: 15, fontWeight: 600, marginBottom: 12, color: '#1f2937' }}>🚀 快速入门</h3>
+                <ol style={{ fontSize: 13, color: '#6b7280', lineHeight: 1.8, paddingLeft: 20 }}>
+                  <li>在"API设置"中填写你的 API Key</li>
+                  <li>点击"测试连接"确认配置正确</li>
+                  <li>打开任意网页，选中文字试试</li>
+                  <li>去"翻译设置"调整你喜欢的参数</li>
+                </ol>
+              </div>
+            </div>
           )}
 
           <button
