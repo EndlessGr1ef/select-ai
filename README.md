@@ -2,86 +2,86 @@
 
 <div align="center">
 
-**[English](README.en.md)** | **中文**
+**English** | **[中文](README.zh-CN.md)**
 
 </div>
 
-智能划词解释工具 | 自动上下文分析 | 多模态OCR识别
+AI-powered Selection Explainer | Context-aware Analysis | Multi-modal OCR
 
-![Demo](demo.gif)
+![Demo](demo_en.gif)
 
-**当前版本**: v0.4.3
-
----
-
-## 🎯 核心亮点
-
-**不是简单翻译，是智能解释**
-
-选中一段文字 → 自动提取上下文（默认5000字/最大50000字）→ AI深度理解 → 给出精准解释
-
-| 场景 | 效果 |
-|------|------|
-| 遇到生僻术语 | 结合上下文语境，理解真实含义 |
-| 阅读专业论文 | 自动提取相关段落，解释更精准 |
-| 外语长句 | 结合前后文，理解整句意思 |
+**Version**: v0.4.3
 
 ---
 
-## ✨ 功能一览
+## 🎯 Key Features
 
-| 功能 | 说明 |
-|------|------|
-| 🧠 上下文感知 | 自动提取5000-50000字上下文，理解更精准 |
-| 🎯 智能划词 | 选中即解释，支持多语言输出 |
-| 🖼️ 图片OCR | 右键图片提取文字并AI解释 |
-| 📷 截图识别 | 框选屏幕区域识别 |
-| 🇯🇵 日语假名 | 汉字上显示假名注音+朗读 |
-| 🔊 朗读功能 | 支持原文/译文朗读 |
-| 🌐 多API | DeepSeek/OpenAI/Claude/智谱 |
+**Not just translation — it's intelligent explanation**
+
+Select text → Extract context (default 5000 / max 50000 chars) → AI deep understanding → Accurate explanation
+
+| Scenario | Benefit |
+|----------|---------|
+| Unfamiliar terms | Understand real meaning from context |
+| Research papers | Extract related paragraphs for better accuracy |
+| Foreign sentences | Comprehend full meaning with surrounding text |
 
 ---
 
-## 🚀 快速开始
+## ✨ Features
+
+| Feature | Description |
+|---------|-------------|
+| 🧠 Context Awareness | Auto-extract 5000-50000 chars context |
+| 🎯 Smart Selection | Select to explain, multi-language output |
+| 🖼️ Image OCR | Right-click images to extract + explain |
+| 📷 Screenshot OCR | Select screen area to recognize |
+| 🇯🇵 Kana Ruby | Kana pronunciation above Japanese kanji |
+| 🔊 Text-to-Speech | Read original/translation aloud |
+| 🌐 Multi-API | DeepSeek/OpenAI/Claude/Zhipu AI |
+
+---
+
+## 🚀 Quick Start
 
 ```
-1. 下载安装扩展
-2. 设置页填入 API Key
-3. 选中文字，点击悬浮按钮
+1. Install the extension
+2. Add your API Key in settings
+3. Select text, click the floating button
 ```
 
 ---
 
-## 🔌 支持的API
+## 🔌 Supported APIs
 
-| 提供商 | 默认模型 | 备注 |
-|--------|----------|------|
-| **DeepSeek** | deepseek-chat | 默认 |
-| **MiniMax** | M2.5 | 多语言强 |
+| Provider | Default Model | Notes |
+|----------|---------------|-------|
+| **DeepSeek** | deepseek-chat | Default |
+| **MiniMax** | M2.5 | Strong multilingual |
 | **OpenAI** | gpt-4o | - |
 | **Anthropic** | claude-sonnet-4-5 | - |
-| **智谱AI** | glm-4.7 | - |
+| **Zhipu AI** | glm-4.7 | - |
 
 ---
 
-## 📥 安装
+## 📥 Installation
 
-1. 下载 [select-ai.zip](select-ai.zip)
-2. 解压 → Chrome 加载 `chrome://extensions/`
-3. 开启开发者模式 → 加载已解压扩展
+1. Download [select-ai.zip](select-ai.zip)
+2. Extract → Chrome → `chrome://extensions/`
+3. Enable Developer mode → Load unpacked
 
 ---
 
 ## ❓ FAQ
 
-**收费吗？** 免费，付API调用费
+**Is it free?** Free to use, pay for API calls
 
-**OCR需要下载什么？** 语言包（英语20MB/日语50MB/中文50MB），首次使用自动下载
+**OCR language packs?** Auto-download on first use (EN: 20MB / JP: 50MB / ZH: 50MB)
 
-**支持所有网站？** 除 chrome:// 等系统页面外都支持
+**All websites?** Except chrome:// system pages
 
-**隐私？** API Key本地存储，不上传用户数据
+**Privacy?** API Key stored locally, no user data uploaded
 
 ---
 
-⭐ 喜欢的话，点个 Star 支持
+⭐ If you find it helpful, give it a Star
