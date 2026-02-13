@@ -57,7 +57,7 @@ Select text → Extract context (default 5000 / max 50000 chars) → AI deep und
 | Provider | Default Model | Notes |
 |----------|---------------|-------|
 | **DeepSeek** | deepseek-chat | Default |
-| **MiniMax** | M2.1 | Strong multilingual |
+| **MiniMax** | M2.5 | Strong multilingual |
 | **OpenAI** | gpt-4o | - |
 | **Anthropic** | claude-sonnet-4-5 | - |
 | **Zhipu AI** | glm-4.7 | - |

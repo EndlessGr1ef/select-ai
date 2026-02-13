@@ -57,7 +57,7 @@
 | 提供商 | 默认模型 | 备注 |
 |--------|----------|------|
 | **DeepSeek** | deepseek-chat | 默认 |
-| **MiniMax** | M2.1 | 多语言强 |
+| **MiniMax** | M2.5 | 多语言强 |
 | **OpenAI** | gpt-4o | - |
 | **Anthropic** | claude-sonnet-4-5 | - |
 | **智谱AI** | glm-4.7 | - |

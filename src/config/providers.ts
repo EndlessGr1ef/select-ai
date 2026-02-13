@@ -38,7 +38,7 @@ export const PROVIDER_CONFIGS: Record<Provider, ProviderConfig> = {
   minimax: {
     name: { zh: 'MiniMax', en: 'MiniMax' },
     defaultBaseUrl: 'https://api.minimaxi.com/anthropic',
-    defaultModel: 'MiniMax-M2.1',
+    defaultModel: 'MiniMax-M2.5',
     storageKey: 'minimax',
     endpointPath: '/v1/messages',
     authHeader: 'Bearer',
