@@ -280,11 +280,18 @@ class OCRService {
   }
 
   // Get list of available languages
-  getAvailableLanguages(): Array<{ id: string; name: string; size: string }> {
+  getAvailableLanguages(uiLang: 'zh' | 'en' = 'zh'): Array<{ id: string; name: string; size: string }> {
+    if (uiLang === 'zh') {
+      return [
+        { id: 'jpn', name: '日语 (Japanese)', size: '~50MB' },
+        { id: 'eng', name: '英语 (English)', size: '~20MB' },
+        { id: 'chs', name: '简体中文 (Chinese)', size: '~50MB' },
+      ];
+    }
     return [
-      { id: 'jpn', name: '日语 (Japanese)', size: '~50MB' },
-      { id: 'eng', name: '英语 (English)', size: '~20MB' },
-      { id: 'chs', name: '简体中文 (Chinese)', size: '~50MB' },
+      { id: 'jpn', name: 'Japanese (日语)', size: '~50MB' },
+      { id: 'eng', name: 'English (英语)', size: '~20MB' },
+      { id: 'chs', name: 'Chinese (简体中文)', size: '~50MB' },
     ];
   }
 

@@ -157,7 +157,11 @@ export const TranslationProvider: React.FC<TranslationProviderProps> = ({ childr
   const abortRef = useRef(false);
 
   useEffect(() => {
-    setUiLang(getUILanguage());
+    const initLang = async () => {
+      const uiLang = await getUILanguage();
+      setUiLang(uiLang);
+    };
+    initLang();
   }, []);
 
   useEffect(() => {

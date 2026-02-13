@@ -71,6 +71,7 @@ async function getCachedProviderConfig() {
     `${storageKey}BaseUrl`,
     `${storageKey}Model`,
     'targetLanguage',
+    'uiLanguage',
     'contextMaxTokens',
     'explanationDetailLevel'
   ];
@@ -85,12 +86,16 @@ async function getCachedProviderConfig() {
       ? rawDetailLevel
       : 'concise';
 
+  // Get stored UI language, fallback to browser language
+  const uiLanguage = (providerSettings.uiLanguage as 'zh' | 'en') || (isBrowserChinese() ? 'zh' : 'en');
+  const defaultTargetLang = uiLanguage === 'zh' ? '中文' : 'English';
+
   cachedProviderConfig = {
     provider,
     apiKey: sanitizeForHeader(providerSettings[`${storageKey}ApiKey`] as string),
     baseUrl: (providerSettings[`${storageKey}BaseUrl`] as string) || config.defaultBaseUrl,
     model: (providerSettings[`${storageKey}Model`] as string) || config.defaultModel,
-    targetLang: (providerSettings.targetLanguage as string) || (isBrowserChinese() ? '中文' : 'English'),
+    targetLang: (providerSettings.targetLanguage as string) || defaultTargetLang,
     contextMaxTokens,
     explanationDetailLevel
   };

@@ -108,7 +108,11 @@ const ContentApp: FC = () => {
   const t = translations.content;
 
   useEffect(() => {
-    setLang(getUILanguage());
+    const initLang = async () => {
+      const uiLang = await getUILanguage();
+      setLang(uiLang);
+    };
+    initLang();
   }, []);
 
   // Preload speech synthesis voices
@@ -884,7 +888,7 @@ const ContentApp: FC = () => {
       setShowPanel(true);
       setLoading(true);
       setResult('');
-      setSelection('识别中...');
+      setSelection(t.ocrRecognizing[lang]);
 
       console.log('[ContentApp] Starting OCR recognition...');
 
@@ -894,8 +898,8 @@ const ContentApp: FC = () => {
 
       if (!settings.ocrLanguages || settings.ocrLanguages.length === 0) {
         setLoading(false);
-        setResult('**错误:** 请先在设置页面选择并下载语言包');
-        setSelection('未配置语言包');
+        setResult(t.ocrNoLanguagePack[lang]);
+        setSelection(t.ocrNoLanguagePackSelection[lang]);
         return;
       }
 
@@ -904,8 +908,8 @@ const ContentApp: FC = () => {
 
       if (!ocrResult.text || ocrResult.text.trim().length === 0) {
         setLoading(false);
-        setResult('**提示:** 未识别到文字，请重新截图');
-        setSelection('未识别到文字');
+        setResult(t.ocrNoText[lang]);
+        setSelection(t.ocrNoTextSelection[lang]);
         return;
       }
 
@@ -921,19 +925,19 @@ const ContentApp: FC = () => {
       setLoading(false);
       
       // More detailed error message
-      let errorMessage = '截图识别失败';
+      let errorMessage = t.ocrScreenshotFailed[lang];
       if (error instanceof Error) {
         if (error.message.includes('Failed to fetch')) {
-          errorMessage = '语言包加载失败，请检查网络连接或在设置页面重新下载语言包';
+          errorMessage = t.ocrLanguagePackLoadFailed[lang];
         } else if (error.message.includes('language')) {
-          errorMessage = '语言包未找到，请在设置页面下载所需语言包';
+          errorMessage = t.ocrLanguagePackNotFound[lang];
         } else {
           errorMessage = error.message;
         }
       }
-      
-      setResult(`**错误:** ${errorMessage}`);
-      setSelection('识别失败');
+
+      setResult(`**${t.errorTitle[lang]}** ${errorMessage}`);
+      setSelection(t.ocrRecognitionFailed[lang]);
     }
   };
 
@@ -1503,7 +1507,7 @@ const ContentApp: FC = () => {
                 <div style={{ flex: 1 }}>
                   {sourceLang === 'ja' && kanaLoading && !kanaText && (
                     <div style={kanaTextStyle}>
-                      {lang === 'zh' ? '平假名生成中...' : 'Generating hiragana...'}
+                      {t.generatingHiragana[lang]}
                     </div>
                   )}
                   {sourceLang === 'ja' && kanaText && (isTextExpanded || selection.length <= 150) ? (
@@ -1526,7 +1530,7 @@ const ContentApp: FC = () => {
                       onMouseOver={(e) => (e.currentTarget.style.opacity = '0.8')}
                       onMouseOut={(e) => (e.currentTarget.style.opacity = '1')}
                     >
-                      {isTextExpanded ? (lang === 'zh' ? '收起' : 'Collapse') : (lang === 'zh' ? '展开全文' : 'Expand')}
+                      {isTextExpanded ? t.collapse[lang] : t.expandFull[lang]}
                     </button>
                   )}
                 </div>

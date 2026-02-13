@@ -1,5 +1,5 @@
 import { useState, useEffect, Fragment, type FC, type CSSProperties } from 'react';
-import { getUILanguage, isBrowserChinese } from '../utils/language';
+import { getUILanguage, mapTargetToUILanguage, isBrowserChinese } from '../utils/language';
 import { translations } from '../utils/i18n';
 import {
   Settings,
@@ -53,7 +53,13 @@ const OptionsApp: FC = () => {
   const [ocrLanguages, setOcrLanguages] = useState<string[]>(['jpn', 'eng']);
 
   useEffect(() => {
-    setLang(getUILanguage());
+    // Get UI language from storage or fallback to browser language
+    const initLang = async () => {
+      const uiLang = await getUILanguage();
+      setLang(uiLang);
+    };
+    initLang();
+
     chrome.storage.local.get(['selectedProvider', 'targetLanguage', 'translationConcurrency', 'translationBlacklistEnabled', 'translationButtonEnabled', 'kanaRubyEnabled', 'contextMaxTokens', 'explanationDetailLevel', 'ocr_enabled', 'ocr_languages'], (result) => {
       if (result.selectedProvider) {
         setProvider(result.selectedProvider as Provider);
@@ -95,12 +101,14 @@ const OptionsApp: FC = () => {
 
   const handleSave = () => {
     const providerStorageKey = PROVIDER_CONFIGS[provider].storageKey;
+    const uiLang = mapTargetToUILanguage(targetLang);
     chrome.storage.local.set({
       selectedProvider: provider,
       [`${providerStorageKey}ApiKey`]: apiKey,
       [`${providerStorageKey}BaseUrl`]: baseUrl,
       [`${providerStorageKey}Model`]: model,
       targetLanguage: targetLang,
+      uiLanguage: uiLang,
       translationConcurrency: concurrency,
       translationBlacklistEnabled: blacklistEnabled,
       translationButtonEnabled,
@@ -787,6 +795,7 @@ const OptionsApp: FC = () => {
             <OCRSettingsComponent
               ocrEnabled={ocrEnabled}
               ocrLanguages={ocrLanguages}
+              uiLang={lang}
               onSave={(settings) => {
                 setOcrEnabled(settings.ocrEnabled);
                 setOcrLanguages(settings.ocrLanguages);

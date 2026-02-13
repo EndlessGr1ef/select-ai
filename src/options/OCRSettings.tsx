@@ -6,10 +6,11 @@ import { ocrService, type OCRSettings } from '../services/ocrService';
 interface OCRSettingsProps {
   ocrEnabled: boolean;
   ocrLanguages: string[];
+  uiLang: 'zh' | 'en';
   onSave: (settings: OCRSettings) => void;
 }
 
-const OCRSettingsComponent: FC<OCRSettingsProps> = ({ ocrEnabled: initialEnabled, ocrLanguages: initialLanguages, onSave }) => {
+const OCRSettingsComponent: FC<OCRSettingsProps> = ({ ocrEnabled: initialEnabled, ocrLanguages: initialLanguages, uiLang, onSave }) => {
   const [ocrEnabled, setOcrEnabled] = useState(initialEnabled);
   const [ocrLanguages, setOcrLanguages] = useState<string[]>(initialLanguages);
   const [downloading, setDownloading] = useState<string | null>(null);
@@ -17,7 +18,7 @@ const OCRSettingsComponent: FC<OCRSettingsProps> = ({ ocrEnabled: initialEnabled
   const [downloadError, setDownloadError] = useState<string | null>(null);
   const [downloadedLangs, setDownloadedLangs] = useState<Record<string, boolean>>({});
 
-  const languages = ocrService.getAvailableLanguages();
+  const languages = ocrService.getAvailableLanguages(uiLang);
 
   // Load downloaded status
   useEffect(() => {

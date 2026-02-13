@@ -4,8 +4,40 @@ export function isBrowserChinese(): boolean {
   return lang.startsWith('zh');
 }
 
+// Map target language to UI language
+// Chinese -> zh, others (English/Japanese/Korean) -> en
+export function mapTargetToUILanguage(targetLang: string): 'zh' | 'en' {
+  return targetLang === '中文' ? 'zh' : 'en';
+}
+
+// Get stored UI language from chrome.storage.local
+// Returns the stored language if available, otherwise null
+export async function getStoredUILanguage(): Promise<'zh' | 'en' | null> {
+  return new Promise((resolve) => {
+    chrome.storage.local.get(['uiLanguage'], (result) => {
+      if (result.uiLanguage === 'zh' || result.uiLanguage === 'en') {
+        resolve(result.uiLanguage);
+      } else {
+        resolve(null);
+      }
+    });
+  });
+}
+
 // Get current UI language (Chinese or English)
-export function getUILanguage(): 'zh' | 'en' {
+// Priority: 1. User's stored preference (if they ever customized target language)
+//           2. Browser language detection
+export async function getUILanguage(): Promise<'zh' | 'en'> {
+  const storedLang = await getStoredUILanguage();
+  if (storedLang) {
+    return storedLang;
+  }
+  return isBrowserChinese() ? 'zh' : 'en';
+}
+
+// Synchronous version for components that can't use async
+// Falls back to browser language, actual stored preference will be applied on next render
+export function getUILanguageSync(): 'zh' | 'en' {
   return isBrowserChinese() ? 'zh' : 'en';
 }
 

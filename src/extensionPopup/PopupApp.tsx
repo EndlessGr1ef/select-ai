@@ -22,7 +22,11 @@ function PopupApp() {
   };
 
   useEffect(() => {
-    setLang(getUILanguage());
+    const initLang = async () => {
+      const uiLang = await getUILanguage();
+      setLang(uiLang);
+    };
+    initLang();
   }, []);
 
   useEffect(() => {

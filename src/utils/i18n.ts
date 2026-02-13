@@ -151,5 +151,19 @@ export const translations = {
     translationLabel: { zh: '🌐 译文:', en: '🌐 Translation:' },
     translateLoading: { zh: '正在翻译...', en: 'Translating...' },
     noSelection: { zh: '请先选择要翻译的文本', en: 'Please select text to translate' },
+    // OCR related
+    ocrNoLanguagePack: { zh: '**错误:** 请先在设置页面选择并下载语言包', en: '**Error:** Please select and download language pack in settings first' },
+    ocrNoLanguagePackSelection: { zh: '未配置语言包', en: 'Language pack not configured' },
+    ocrNoText: { zh: '**提示:** 未识别到文字，请重新截图', en: '**Tip:** No text recognized, please try again' },
+    ocrNoTextSelection: { zh: '未识别到文字', en: 'No text recognized' },
+    ocrScreenshotFailed: { zh: '截图识别失败', en: 'Screenshot recognition failed' },
+    ocrLanguagePackLoadFailed: { zh: '语言包加载失败，请检查网络连接或在设置页面重新下载语言包', en: 'Language pack load failed, please check network connection or re-download in settings' },
+    ocrLanguagePackNotFound: { zh: '语言包未找到，请在设置页面下载所需语言包', en: 'Language pack not found, please download required language pack in settings' },
+    ocrRecognitionFailed: { zh: '识别失败', en: 'Recognition failed' },
+    ocrRecognizing: { zh: '识别中...', en: 'Recognizing...' },
+    // Content app UI
+    generatingHiragana: { zh: '平假名生成中...', en: 'Generating hiragana...' },
+    collapse: { zh: '收起', en: 'Collapse' },
+    expandFull: { zh: '展开全文', en: 'Expand' },
   },
 };
