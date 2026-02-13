@@ -802,94 +802,199 @@ const OptionsApp: FC = () => {
             <div style={sectionStyle}>
               <div style={sectionTitleStyle}>
                 <HelpCircle size={14} strokeWidth={2} />
-                Select AI 使用帮助
-              </div>
-              
-              {/* 核心功能 */}
-              <div style={{ marginBottom: 24 }}>
-                <h3 style={{ fontSize: 15, fontWeight: 600, marginBottom: 12, color: '#1f2937' }}>🎯 核心功能</h3>
-                
-                <div style={{ backgroundColor: '#f9fafb', borderRadius: 8, padding: 16, marginBottom: 12 }}>
-                  <h4 style={{ fontSize: 14, fontWeight: 600, marginBottom: 8, color: '#374151' }}>智能划词解释</h4>
-                  <p style={{ fontSize: 13, color: '#6b7280', lineHeight: 1.6, marginBottom: 8 }}>选中网页任意文字，点击出现的粉紫色悬浮按钮，AI会自动提取上下文并给出精准解释（不是简单翻译）。</p>
-                  <p style={{ fontSize: 12, color: '#9ca3af' }}>适用：遇到生僻术语、阅读专业论文、学习外语</p>
-                </div>
-
-                <div style={{ backgroundColor: '#f9fafb', borderRadius: 8, padding: 16, marginBottom: 12 }}>
-                  <h4 style={{ fontSize: 14, fontWeight: 600, marginBottom: 8, color: '#374151' }}>上下文感知</h4>
-                  <p style={{ fontSize: 13, color: '#6b7280', lineHeight: 1.6, marginBottom: 8 }}>自动提取选中文字周围的上下文内容（默认5000字，最大50000字），帮助AI更准确理解含义。</p>
-                  <p style={{ fontSize: 12, color: '#9ca3af' }}>在"翻译设置"中可调整上下文长度</p>
-                </div>
-
-                <div style={{ backgroundColor: '#f9fafb', borderRadius: 8, padding: 16 }}>
-                  <h4 style={{ fontSize: 14, fontWeight: 600, marginBottom: 8, color: '#374151' }}>双语翻译</h4>
-                  <p style={{ fontSize: 13, color: '#6b7280', lineHeight: 1.6 }}>原文+译文并排显示，支持整页翻译或选中翻译。输出语言可自定义（中文/英文/日文/韩文）。</p>
-                </div>
+                {t.helpTitle[lang]}
               </div>
 
-              {/* OCR功能 */}
-              <div style={{ marginBottom: 24 }}>
-                <h3 style={{ fontSize: 15, fontWeight: 600, marginBottom: 12, color: '#1f2937' }}>🖼️ OCR 识别</h3>
-                
-                <div style={{ backgroundColor: '#f9fafb', borderRadius: 8, padding: 16, marginBottom: 12 }}>
-                  <h4 style={{ fontSize: 14, fontWeight: 600, marginBottom: 8, color: '#374151' }}>图片文字识别</h4>
-                  <p style={{ fontSize: 13, color: '#6b7280', lineHeight: 1.6, marginBottom: 8 }}>在网页图片上右键 → 选择 "Select AI" → "识别文字"或"解释图片"</p>
-                  <p style={{ fontSize: 12, color: '#9ca3af' }}>支持：英语、日语、简体中文（需在设置中下载语言包）</p>
-                </div>
-
-                <div style={{ backgroundColor: '#f9fafb', borderRadius: 8, padding: 16 }}>
-                  <h4 style={{ fontSize: 14, fontWeight: 600, marginBottom: 8, color: '#374151' }}>截图识别</h4>
-                  <p style={{ fontSize: 13, color: '#6b7280', lineHeight: 1.6 }}>点击扩展图标 → "截图识别" → 框选屏幕区域 → 自动识别文字并解释</p>
-                </div>
+              {/* Quick Nav Buttons */}
+              <div style={{ display: 'flex', gap: 8, marginBottom: 20, flexWrap: 'wrap' }}>
+                <button
+                  onClick={() => setActiveTab('api')}
+                  style={{
+                    padding: '6px 12px',
+                    fontSize: 12,
+                    backgroundColor: '#e0e7ff',
+                    border: 'none',
+                    borderRadius: 6,
+                    color: '#3730a3',
+                    cursor: 'pointer',
+                    fontWeight: 500,
+                  }}
+                >
+                  {t.helpNavApiSettings[lang]}
+                </button>
+                <button
+                  onClick={() => setActiveTab('translation')}
+                  style={{
+                    padding: '6px 12px',
+                    fontSize: 12,
+                    backgroundColor: '#dcfce7',
+                    border: 'none',
+                    borderRadius: 6,
+                    color: '#166534',
+                    cursor: 'pointer',
+                    fontWeight: 500,
+                  }}
+                >
+                  {t.helpNavTranslationSettings[lang]}
+                </button>
+                <button
+                  onClick={() => setActiveTab('ocr')}
+                  style={{
+                    padding: '6px 12px',
+                    fontSize: 12,
+                    backgroundColor: '#fef3c7',
+                    border: 'none',
+                    borderRadius: 6,
+                    color: '#92400e',
+                    cursor: 'pointer',
+                    fontWeight: 500,
+                  }}
+                >
+                  {t.helpNavOCR[lang]}
+                </button>
               </div>
 
-              {/* 日语功能 */}
-              <div style={{ marginBottom: 24 }}>
-                <h3 style={{ fontSize: 15, fontWeight: 600, marginBottom: 12, color: '#1f2937' }}>🇯🇵 日语学习</h3>
-                
-                <div style={{ backgroundColor: '#f9fafb', borderRadius: 8, padding: 16, marginBottom: 12 }}>
-                  <h4 style={{ fontSize: 14, fontWeight: 600, marginBottom: 8, color: '#374151' }}>假名标注</h4>
-                  <p style={{ fontSize: 13, color: '#6b7280', lineHeight: 1.6, marginBottom: 8 }}>在日语汉字上方显示假名注音（Ruby），如：日本語(にほんご)</p>
-                  <p style={{ fontSize: 12, color: '#9ca3af' }}>在"翻译设置"中可开关</p>
+              {/* Core Features */}
+              <details style={{ marginBottom: 16 }}>
+                <summary style={{ cursor: 'pointer', padding: '10px 12px', backgroundColor: '#f3f4f6', borderRadius: 8, fontWeight: 600, fontSize: 14, color: '#1f2937' }}>
+                  🎯 {t.helpCoreFeatures[lang]}
+                </summary>
+                <div style={{ padding: '12px 0' }}>
+                  <div style={{ backgroundColor: '#f9fafb', borderRadius: 8, padding: 16, marginBottom: 12 }}>
+                    <h4 style={{ fontSize: 14, fontWeight: 600, marginBottom: 8, color: '#374151' }}>{t.helpSmartSelection[lang]}</h4>
+                    <p style={{ fontSize: 13, color: '#6b7280', lineHeight: 1.6, marginBottom: 8 }}>{t.helpSmartSelectionDesc[lang]}</p>
+                    <p style={{ fontSize: 12, color: '#9ca3af' }}>{t.helpSmartSelection适用[lang]}</p>
+                  </div>
+
+                  <div style={{ backgroundColor: '#f9fafb', borderRadius: 8, padding: 16, marginBottom: 12 }}>
+                    <h4 style={{ fontSize: 14, fontWeight: 600, marginBottom: 8, color: '#374151' }}>{t.helpContextAware[lang]}</h4>
+                    <p style={{ fontSize: 13, color: '#6b7280', lineHeight: 1.6, marginBottom: 8 }}>
+                      {t.helpContextAwareDesc[lang].replace('{default}', '5000').replace('{max}', '50000')}
+                    </p>
+                    <p style={{ fontSize: 12, color: '#9ca3af' }}>{t.helpContextAwareHint[lang]}</p>
+                  </div>
+
+                  <div style={{ backgroundColor: '#f9fafb', borderRadius: 8, padding: 16 }}>
+                    <h4 style={{ fontSize: 14, fontWeight: 600, marginBottom: 8, color: '#374151' }}>{t.helpBilingual[lang]}</h4>
+                    <p style={{ fontSize: 13, color: '#6b7280', lineHeight: 1.6 }}>{t.helpBilingualDesc[lang]}</p>
+                  </div>
                 </div>
+              </details>
 
-                <div style={{ backgroundColor: '#f9fafb', borderRadius: 8, padding: 16 }}>
-                  <h4 style={{ fontSize: 14, fontWeight: 600, marginBottom: 8, color: '#374151' }}>朗读功能</h4>
-                  <p style={{ fontSize: 13, color: '#6b7280', lineHeight: 1.6 }}>点击面板中的朗读按钮，可朗读原文或译文。支持日语假名+朗读组合。</p>
+              {/* OCR */}
+              <details style={{ marginBottom: 16 }}>
+                <summary style={{ cursor: 'pointer', padding: '10px 12px', backgroundColor: '#f3f4f6', borderRadius: 8, fontWeight: 600, fontSize: 14, color: '#1f2937' }}>
+                  🖼️ {t.helpOCR[lang]}
+                </summary>
+                <div style={{ padding: '12px 0' }}>
+                  <div style={{ backgroundColor: '#f9fafb', borderRadius: 8, padding: 16, marginBottom: 12 }}>
+                    <h4 style={{ fontSize: 14, fontWeight: 600, marginBottom: 8, color: '#374151' }}>{t.helpOCRImage[lang]}</h4>
+                    <p style={{ fontSize: 13, color: '#6b7280', lineHeight: 1.6, marginBottom: 8 }}>{t.helpOCRImageDesc[lang]}</p>
+                    <p style={{ fontSize: 12, color: '#9ca3af' }}>{t.helpOCRImageHint[lang]}</p>
+                  </div>
+
+                  <div style={{ backgroundColor: '#f9fafb', borderRadius: 8, padding: 16 }}>
+                    <h4 style={{ fontSize: 14, fontWeight: 600, marginBottom: 8, color: '#374151' }}>{t.helpOCRScreenshot[lang]}</h4>
+                    <p style={{ fontSize: 13, color: '#6b7280', lineHeight: 1.6 }}>{t.helpOCRScreenshotDesc[lang]}</p>
+                  </div>
                 </div>
-              </div>
+              </details>
 
-              {/* 面板操作 */}
-              <div style={{ marginBottom: 24 }}>
-                <h3 style={{ fontSize: 15, fontWeight: 600, marginBottom: 12, color: '#1f2937' }}>🖱️ 面板操作</h3>
-                <ul style={{ fontSize: 13, color: '#6b7280', lineHeight: 1.8, paddingLeft: 20 }}>
-                  <li>拖拽面板顶部移动位置</li>
-                  <li>拖拽面板边缘调整大小</li>
-                  <li>点击面板外区域或按 ESC 关闭</li>
-                </ul>
-              </div>
+              {/* Japanese Learning */}
+              <details style={{ marginBottom: 16 }}>
+                <summary style={{ cursor: 'pointer', padding: '10px 12px', backgroundColor: '#f3f4f6', borderRadius: 8, fontWeight: 600, fontSize: 14, color: '#1f2937' }}>
+                  🇯🇵 {t.helpJapanese[lang]}
+                </summary>
+                <div style={{ padding: '12px 0' }}>
+                  <div style={{ backgroundColor: '#f9fafb', borderRadius: 8, padding: 16, marginBottom: 12 }}>
+                    <h4 style={{ fontSize: 14, fontWeight: 600, marginBottom: 8, color: '#374151' }}>{t.helpKanaRuby[lang]}</h4>
+                    <p style={{ fontSize: 13, color: '#6b7280', lineHeight: 1.6, marginBottom: 8 }}>{t.helpKanaRubyDesc[lang]}</p>
+                    <p style={{ fontSize: 12, color: '#9ca3af' }}>{t.helpKanaRubyHint[lang]}</p>
+                  </div>
 
-              {/* 隐私 */}
-              <div style={{ marginBottom: 24 }}>
-                <h3 style={{ fontSize: 15, fontWeight: 600, marginBottom: 12, color: '#1f2937' }}>🔒 隐私安全</h3>
+                  <div style={{ backgroundColor: '#f9fafb', borderRadius: 8, padding: 16 }}>
+                    <h4 style={{ fontSize: 14, fontWeight: 600, marginBottom: 8, color: '#374151' }}>{t.helpTTS[lang]}</h4>
+                    <p style={{ fontSize: 13, color: '#6b7280', lineHeight: 1.6 }}>{t.helpTTSDesc[lang]}</p>
+                  </div>
+                </div>
+              </details>
+
+              {/* Panel Operations */}
+              <details style={{ marginBottom: 16 }}>
+                <summary style={{ cursor: 'pointer', padding: '10px 12px', backgroundColor: '#f3f4f6', borderRadius: 8, fontWeight: 600, fontSize: 14, color: '#1f2937' }}>
+                  🖱️ {t.helpPanelOps[lang]}
+                </summary>
+                <div style={{ padding: '12px 0' }}>
+                  <ul style={{ fontSize: 13, color: '#6b7280', lineHeight: 1.8, paddingLeft: 20 }}>
+                    <li>{t.helpPanelOp1[lang]}</li>
+                    <li>{t.helpPanelOp2[lang]}</li>
+                    <li>{t.helpPanelOp3[lang]}</li>
+                  </ul>
+                </div>
+              </details>
+
+              {/* Privacy */}
+              <div style={{ marginBottom: 20 }}>
+                <h3 style={{ fontSize: 15, fontWeight: 600, marginBottom: 12, color: '#1f2937' }}>🔒 {t.helpPrivacy[lang]}</h3>
                 <div style={{ backgroundColor: '#ecfdf5', border: '1px solid #a7f3d0', borderRadius: 8, padding: 12 }}>
                   <p style={{ fontSize: 13, color: '#065f46', lineHeight: 1.6 }}>
-                    ✅ API Key 仅存储在本地浏览器<br/>
-                    ✅ 不上传任何用户数据<br/>
-                    ✅ 不收集浏览记录
+                    ✅ {t.helpPrivacyLocal[lang]}<br/>
+                    ✅ {t.helpPrivacyNoUpload[lang]}<br/>
+                    ✅ {t.helpPrivacyNoCollect[lang]}
                   </p>
                 </div>
               </div>
 
-              {/* 快捷入门 */}
-              <div>
-                <h3 style={{ fontSize: 15, fontWeight: 600, marginBottom: 12, color: '#1f2937' }}>🚀 快速入门</h3>
+              {/* Quick Start */}
+              <div style={{ marginBottom: 20 }}>
+                <h3 style={{ fontSize: 15, fontWeight: 600, marginBottom: 12, color: '#1f2937' }}>🚀 {t.helpQuickStart[lang]}</h3>
                 <ol style={{ fontSize: 13, color: '#6b7280', lineHeight: 1.8, paddingLeft: 20 }}>
-                  <li>在"API设置"中填写你的 API Key</li>
-                  <li>点击"测试连接"确认配置正确</li>
-                  <li>打开任意网页，选中文字试试</li>
-                  <li>去"翻译设置"调整你喜欢的参数</li>
+                  <li>{t.helpQuickStart1[lang]}</li>
+                  <li>{t.helpQuickStart2[lang]}</li>
+                  <li>{t.helpQuickStart3[lang]}</li>
+                  <li>{t.helpQuickStart4[lang]}</li>
                 </ol>
+              </div>
+
+              {/* FAQ */}
+              <div>
+                <h3 style={{ fontSize: 15, fontWeight: 600, marginBottom: 12, color: '#1f2937' }}>❓ {t.helpFAQ[lang]}</h3>
+
+                <details style={{ marginBottom: 12 }}>
+                  <summary style={{ cursor: 'pointer', padding: '10px 12px', backgroundColor: '#fef3c7', borderRadius: 8, fontWeight: 500, fontSize: 13, color: '#92400e' }}>
+                    {t.helpFAQApiKey[lang]}
+                  </summary>
+                  <div style={{ padding: '12px 0 12px 12px', fontSize: 13, color: '#6b7280', lineHeight: 1.6 }}>
+                    {t.helpFAQApiKeyAns[lang]}
+                  </div>
+                </details>
+
+                <details style={{ marginBottom: 12 }}>
+                  <summary style={{ cursor: 'pointer', padding: '10px 12px', backgroundColor: '#fef3c7', borderRadius: 8, fontWeight: 500, fontSize: 13, color: '#92400e' }}>
+                    {t.helpFAQEmpty[lang]}
+                  </summary>
+                  <div style={{ padding: '12px 0 12px 12px', fontSize: 13, color: '#6b7280', lineHeight: 1.6 }}>
+                    {t.helpFAQEmptyAns[lang]}
+                  </div>
+                </details>
+
+                <details style={{ marginBottom: 12 }}>
+                  <summary style={{ cursor: 'pointer', padding: '10px 12px', backgroundColor: '#fef3c7', borderRadius: 8, fontWeight: 500, fontSize: 13, color: '#92400e' }}>
+                    {t.helpFAQTimeout[lang]}
+                  </summary>
+                  <div style={{ padding: '12px 0 12px 12px', fontSize: 13, color: '#6b7280', lineHeight: 1.6 }}>
+                    {t.helpFAQTimeoutAns[lang]}
+                  </div>
+                </details>
+
+                <details style={{ marginBottom: 12 }}>
+                  <summary style={{ cursor: 'pointer', padding: '10px 12px', backgroundColor: '#fef3c7', borderRadius: 8, fontWeight: 500, fontSize: 13, color: '#92400e' }}>
+                    {t.helpFAQError[lang]}
+                  </summary>
+                  <div style={{ padding: '12px 0 12px 12px', fontSize: 13, color: '#6b7280', lineHeight: 1.6 }}>
+                    {t.helpFAQErrorAns[lang]}
+                  </div>
+                </details>
               </div>
             </div>
           )}
