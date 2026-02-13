@@ -2,7 +2,7 @@
 
 <div align="center">
 
-**[English](README.en.md)** | **中文**
+**English** | **[中文](README.md)**
 
 </div>
 
