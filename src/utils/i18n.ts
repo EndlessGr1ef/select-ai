@@ -63,7 +63,9 @@ export const translations = {
     blacklistCancel: { zh: '取消', en: 'Cancel' },
     // Tab headers
     tabApiConfig: { zh: 'API 配置', en: 'API Config' },
-    tabTranslationSettings: { zh: '双语字幕翻译', en: 'Bilingual Subtitle Translation' },
+    tabTranslationSettings: { zh: '双语字幕翻译', en: 'Bilingual Translation' },
+    tabOCR: { zh: '图片识别', en: 'OCR' },
+    tabHelp: { zh: '使用帮助', en: 'Help' },
     // Translation settings section
     translationSettingsTitle: { zh: '双语字幕翻译设置', en: 'Bilingual Subtitle Translation Settings' },
     translationButtonToggleLabel: { zh: '显示翻译按钮', en: 'Show translation button' },

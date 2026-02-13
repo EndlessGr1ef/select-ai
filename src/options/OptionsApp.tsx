@@ -215,7 +215,8 @@ const OptionsApp: FC = () => {
 
   const tabContainerStyle: CSSProperties = {
     display: 'flex',
-    gap: 6,
+    gap: 8,
+    flexWrap: 'wrap',
     marginTop: 24,
   };
 
@@ -484,14 +485,14 @@ const OptionsApp: FC = () => {
               onClick={() => setActiveTab('ocr')}
             >
               <span>📷</span>
-              图片识别
+              {t.tabOCR[lang]}
             </button>
             <button
               style={getTabStyle(activeTab === 'help')}
               onClick={() => setActiveTab('help')}
             >
               <HelpCircle size={16} strokeWidth={2} />
-              使用帮助
+              {t.tabHelp[lang]}
             </button>
           </div>
         </div>
@@ -893,15 +894,17 @@ const OptionsApp: FC = () => {
             </div>
           )}
 
-          <button
-            style={buttonStyle}
-            onClick={handleSave}
-          >
-            <Save size={18} strokeWidth={2} />
-            {t.saveBtn[lang]}
-          </button>
+          {activeTab !== 'help' && (
+            <button
+              style={buttonStyle}
+              onClick={handleSave}
+            >
+              <Save size={18} strokeWidth={2} />
+              {t.saveBtn[lang]}
+            </button>
+          )}
 
-          {status.type !== 'idle' && (
+          {activeTab !== 'help' && status.type !== 'idle' && (
             <div style={statusStyle}>
               {status.type === 'success' ? (
                 <CheckCircle2 size={18} strokeWidth={2} />
@@ -912,22 +915,24 @@ const OptionsApp: FC = () => {
             </div>
           )}
 
-          <div style={infoCardStyle}>
-            <div style={infoTitleStyle}>
-              {t.guideTitle[lang]}
+          {activeTab !== 'help' && (
+            <div style={infoCardStyle}>
+              <div style={infoTitleStyle}>
+                {t.guideTitle[lang]}
+              </div>
+              <ul style={infoListStyle}>
+                {activeTab === 'api' ? (
+                  (t.guideSteps as Record<string, string[]>)[lang].map((step, i) => (
+                    <li key={i}>{step}</li>
+                  ))
+                ) : (
+                  (t.translationGuideSteps as Record<string, string[]>)[lang].map((step, i) => (
+                    <li key={i}>{step}</li>
+                  ))
+                )}
+              </ul>
             </div>
-            <ul style={infoListStyle}>
-              {activeTab === 'api' ? (
-                (t.guideSteps as Record<string, string[]>)[lang].map((step, i) => (
-                  <li key={i}>{step}</li>
-                ))
-              ) : (
-                (t.translationGuideSteps as Record<string, string[]>)[lang].map((step, i) => (
-                  <li key={i}>{step}</li>
-                ))
-              )}
-            </ul>
-          </div>
+          )}
         </div>
       </div>
     </div >
